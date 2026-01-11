@@ -5,18 +5,26 @@ use reqwest::{
 use url::Url;
 
 use super::types::{DepositRequest, DepositResponse, SupportedAssetsResponse};
+use crate::error::Error;
 use crate::Result;
 
-/// Client for the Polymarket Bridge API.
+const DEFAULT_HOST: &str = "https://bridge.kuest.com/#disabled";
+const DISABLED_HOST: &str = "bridge.kuest.com";
+
+fn is_disabled_host(host: &Url) -> bool {
+    host.fragment().is_some() || host.host_str() == Some(DISABLED_HOST)
+}
+
+/// Client for the Kuest Bridge API.
 ///
 /// The Bridge API enables bridging assets from various chains (EVM, Solana, Bitcoin)
-/// to USDC.e on Polygon for trading on Polymarket.
+/// to USDC.e on Polygon for trading on Kuest.
 ///
 /// # Example
 ///
 /// ```no_run
-/// use polymarket_client_sdk::types::address;
-/// use polymarket_client_sdk::bridge::{Client, types::DepositRequest};
+/// use kuest_client_sdk::types::address;
+/// use kuest_client_sdk::bridge::{Client, types::DepositRequest};
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let client = Client::default();
@@ -36,11 +44,12 @@ use crate::Result;
 pub struct Client {
     host: Url,
     client: ReqwestClient,
+    disabled: bool,
 }
 
 impl Default for Client {
     fn default() -> Self {
-        Client::new("https://bridge.polymarket.com")
+        Client::new(DEFAULT_HOST)
             .expect("Client with default endpoint should succeed")
     }
 }
@@ -59,10 +68,13 @@ impl Client {
         headers.insert("Connection", HeaderValue::from_static("keep-alive"));
         headers.insert("Content-Type", HeaderValue::from_static("application/json"));
         let client = ReqwestClient::builder().default_headers(headers).build()?;
+        let host = Url::parse(host)?;
+        let disabled = is_disabled_host(&host);
 
         Ok(Self {
-            host: Url::parse(host)?,
+            host,
             client,
+            disabled,
         })
     }
 
@@ -77,16 +89,23 @@ impl Client {
         &self.client
     }
 
-    /// Create deposit addresses for a Polymarket wallet.
+    fn ensure_enabled(&self) -> Result<()> {
+        if self.disabled {
+            return Err(Error::validation("Bridge desativada"));
+        }
+        Ok(())
+    }
+
+    /// Create deposit addresses for a Kuest wallet.
     ///
-    /// Generates unique deposit addresses for bridging assets to Polymarket.
+    /// Generates unique deposit addresses for bridging assets to Kuest.
     /// Returns addresses for EVM-compatible chains, Solana, and Bitcoin.
     ///
     /// # Example
     ///
     /// ```no_run
-    /// use polymarket_client_sdk::types::address;
-    /// use polymarket_client_sdk::bridge::{Client, types::DepositRequest};
+    /// use kuest_client_sdk::types::address;
+    /// use kuest_client_sdk::bridge::{Client, types::DepositRequest};
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::default();
@@ -102,6 +121,7 @@ impl Client {
     /// # }
     /// ```
     pub async fn deposit(&self, request: &DepositRequest) -> Result<DepositResponse> {
+        self.ensure_enabled()?;
         let request = self
             .client()
             .request(Method::POST, format!("{}deposit", self.host()))
@@ -119,7 +139,7 @@ impl Client {
     /// # Example
     ///
     /// ```no_run
-    /// use polymarket_client_sdk::bridge::Client;
+    /// use kuest_client_sdk::bridge::Client;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::default();
@@ -138,6 +158,7 @@ impl Client {
     /// # }
     /// ```
     pub async fn supported_assets(&self) -> Result<SupportedAssetsResponse> {
+        self.ensure_enabled()?;
         let request = self
             .client()
             .request(Method::GET, format!("{}supported-assets", self.host()))

@@ -1,4 +1,4 @@
-//! Response types for the Polymarket Data API.
+//! Response types for the Kuest Data API.
 //!
 //! This module contains structs representing API responses from the Data API endpoints.
 
@@ -364,7 +364,7 @@ pub struct LiveVolume {
 /// A builder's entry in the aggregated leaderboard.
 ///
 /// Returned by the `/v1/builders/leaderboard` endpoint. Builders are third-party
-/// applications that integrate with Polymarket.
+/// applications that integrate with Kuest.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]

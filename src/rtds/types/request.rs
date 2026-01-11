@@ -141,7 +141,7 @@ impl Serialize for Subscription {
         if let Some(filters) = &self.filters {
             // Chainlink endpoint expects filters as a JSON string (escaped),
             // while other endpoints (like Binance crypto_prices) expect raw JSON.
-            // See: https://github.com/Polymarket/rs-clob-client/issues/136
+            // See: https://github.com/kuestcom/rs-clob-client/issues/136
             if self.topic == "crypto_prices_chainlink" {
                 // Chainlink: emit filters as string, e.g. "{\"symbol\":\"btc/usd\"}"
                 map.serialize_entry("filters", filters)?;
@@ -195,7 +195,7 @@ mod tests {
         assert!(json.contains("\"topic\":\"crypto_prices_chainlink\""));
         assert!(json.contains("\"type\":\"*\""));
         // Chainlink filters should be a JSON string (escaped), not a raw JSON object
-        // See: https://github.com/Polymarket/rs-clob-client/issues/136
+        // See: https://github.com/kuestcom/rs-clob-client/issues/136
         assert!(
             json.contains(r#""filters":"{\"symbol\":\"eth/usd\"}""#),
             "Chainlink filters should be serialized as escaped JSON string, got: {json}"

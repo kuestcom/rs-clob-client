@@ -58,7 +58,7 @@ pub struct PositionIdRequest {
 pub struct SplitPositionRequest {
     /// The collateral token address (e.g., USDC)
     pub collateral_token: Address,
-    /// Parent collection ID (typically zero for Polymarket)
+    /// Parent collection ID (typically zero for Kuest)
     #[builder(default)]
     pub parent_collection_id: B256,
     /// The condition ID to split on
@@ -78,7 +78,7 @@ pub struct SplitPositionRequest {
 pub struct MergePositionsRequest {
     /// The collateral token address (e.g., USDC)
     pub collateral_token: Address,
-    /// Parent collection ID (typically zero for Polymarket)
+    /// Parent collection ID (typically zero for Kuest)
     #[builder(default)]
     pub parent_collection_id: B256,
     /// The condition ID to merge on
@@ -98,7 +98,7 @@ pub struct MergePositionsRequest {
 pub struct RedeemPositionsRequest {
     /// The collateral token address (e.g., USDC)
     pub collateral_token: Address,
-    /// Parent collection ID (typically zero for Polymarket)
+    /// Parent collection ID (typically zero for Kuest)
     #[builder(default)]
     pub parent_collection_id: B256,
     /// The condition ID to redeem
@@ -130,8 +130,8 @@ impl SplitPositionRequest {
     /// # Example
     ///
     /// ```no_run
-    /// # use polymarket_client_sdk::ctf::types::SplitPositionRequest;
-    /// # use polymarket_client_sdk::types::address;
+    /// # use kuest_client_sdk::ctf::types::SplitPositionRequest;
+    /// # use kuest_client_sdk::types::address;
     /// # use alloy::primitives::{B256, U256};
     /// let request = SplitPositionRequest::for_binary_market(
     ///     address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"), // USDC
@@ -159,8 +159,8 @@ impl MergePositionsRequest {
     /// # Example
     ///
     /// ```no_run
-    /// # use polymarket_client_sdk::ctf::types::MergePositionsRequest;
-    /// # use polymarket_client_sdk::types::address;
+    /// # use kuest_client_sdk::ctf::types::MergePositionsRequest;
+    /// # use kuest_client_sdk::types::address;
     /// # use alloy::primitives::{B256, U256};
     /// let request = MergePositionsRequest::for_binary_market(
     ///     address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"), // USDC
@@ -188,8 +188,8 @@ impl RedeemPositionsRequest {
     /// # Example
     ///
     /// ```no_run
-    /// # use polymarket_client_sdk::ctf::types::RedeemPositionsRequest;
-    /// # use polymarket_client_sdk::types::address;
+    /// # use kuest_client_sdk::ctf::types::RedeemPositionsRequest;
+    /// # use kuest_client_sdk::types::address;
     /// # use alloy::primitives::{B256, U256};
     /// let request = RedeemPositionsRequest::for_binary_market(
     ///     address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"), // USDC

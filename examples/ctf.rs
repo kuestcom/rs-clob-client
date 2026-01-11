@@ -19,7 +19,7 @@
 //!
 //! For write operations (split, merge, redeem), you need a private key:
 //! ```sh
-//! export POLYMARKET_PRIVATE_KEY="your_private_key"
+//! export KUEST_PRIVATE_KEY="your_private_key"
 //! cargo run --example ctf --features ctf -- --write
 //! ```
 
@@ -31,13 +31,13 @@ use alloy::providers::ProviderBuilder;
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
 use anyhow::Result;
-use polymarket_client_sdk::ctf::Client;
-use polymarket_client_sdk::ctf::types::{
+use kuest_client_sdk::ctf::Client;
+use kuest_client_sdk::ctf::types::{
     CollectionIdRequest, ConditionIdRequest, MergePositionsRequest, PositionIdRequest,
     RedeemPositionsRequest, SplitPositionRequest,
 };
-use polymarket_client_sdk::types::address;
-use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
+use kuest_client_sdk::types::address;
+use kuest_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
 use tracing::{error, info};
 
 const RPC_URL: &str = "https://polygon-rpc.com";
@@ -216,7 +216,7 @@ async fn main() -> Result<()> {
     } else {
         info!("--- Write Operations ---");
         info!("To test write operations (split, merge, redeem), run with --write flag:");
-        info!("  export POLYMARKET_PRIVATE_KEY=\"your_private_key\"");
+        info!("  export KUEST_PRIVATE_KEY=\"your_private_key\"");
         info!("  cargo run --example ctf --features ctf -- --write");
     }
 

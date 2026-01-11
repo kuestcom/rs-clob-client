@@ -12,17 +12,17 @@ use std::str::FromStr as _;
 use alloy::primitives::U256;
 use chrono::{DateTime, Utc};
 use httpmock::MockServer;
-use polymarket_client_sdk::POLYGON;
-use polymarket_client_sdk::clob::types::SignatureType;
-use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::types::{Decimal, b256};
+use kuest_client_sdk::POLYGON;
+use kuest_client_sdk::clob::types::SignatureType;
+use kuest_client_sdk::clob::{Client, Config};
+use kuest_client_sdk::types::{Decimal, b256};
 use reqwest::StatusCode;
 use rust_decimal_macros::dec;
 use serde_json::json;
 use uuid::Uuid;
 
 use crate::common::{
-    POLY_ADDRESS, POLY_API_KEY, POLY_PASSPHRASE, PRIVATE_KEY, create_authenticated,
+    KUEST_ADDRESS, KUEST_API_KEY, KUEST_PASSPHRASE, PRIVATE_KEY, create_authenticated,
     ensure_requirements,
 };
 
@@ -31,20 +31,20 @@ mod unauthenticated {
     use chrono::{TimeDelta, TimeZone as _};
     use futures_util::future;
     use futures_util::stream::StreamExt as _;
-    use polymarket_client_sdk::clob::types::request::{
+    use kuest_client_sdk::clob::types::request::{
         LastTradePriceRequest, MidpointRequest, OrderBookSummaryRequest, PriceHistoryRequest,
         PriceRequest, SpreadRequest,
     };
-    use polymarket_client_sdk::clob::types::response::{
+    use kuest_client_sdk::clob::types::response::{
         FeeRateResponse, GeoblockResponse, LastTradePriceResponse, LastTradesPricesResponse,
         MarketResponse, MidpointResponse, MidpointsResponse, NegRiskResponse,
         OrderBookSummaryResponse, OrderSummary, Page, PriceHistoryResponse, PricePoint,
         PriceResponse, PricesResponse, Rewards, SimplifiedMarketResponse, SpreadResponse,
         SpreadsResponse, TickSizeResponse, Token,
     };
-    use polymarket_client_sdk::clob::types::{Interval, Side, TickSize, TimeRange};
-    use polymarket_client_sdk::error::Status;
-    use polymarket_client_sdk::types::address;
+    use kuest_client_sdk::clob::types::{Interval, Side, TickSize, TimeRange};
+    use kuest_client_sdk::error::Status;
+    use kuest_client_sdk::types::address;
     use reqwest::Method;
 
     use super::*;
@@ -1239,7 +1239,7 @@ mod unauthenticated {
         let client = Client::new(&server.base_url(), config)?;
 
         let mock = server.mock(|when, then| {
-            when.method(httpmock::Method::GET).path("/api/geoblock");
+            when.method(httpmock::Method::GET).path("/geoblock");
             then.status(StatusCode::OK).json_body(json!({
                 "blocked": false,
                 "ip": "192.168.1.1",
@@ -1270,7 +1270,7 @@ mod unauthenticated {
         let client = Client::new(&server.base_url(), config)?;
 
         let mock = server.mock(|when, then| {
-            when.method(httpmock::Method::GET).path("/api/geoblock");
+            when.method(httpmock::Method::GET).path("/geoblock");
             then.status(StatusCode::OK).json_body(json!({
                 "blocked": true,
                 "ip": "10.0.0.1",
@@ -1298,28 +1298,28 @@ mod authenticated {
     use alloy::signers::local::LocalSigner;
     use chrono::NaiveDate;
     use httpmock::Method::{DELETE, GET, POST};
-    use polymarket_client_sdk::clob::types::request::{
+    use kuest_client_sdk::clob::types::request::{
         BalanceAllowanceRequest, CancelMarketOrderRequest, DeleteNotificationsRequest,
         OrdersRequest, TradesRequest, UserRewardsEarningRequest,
     };
-    use polymarket_client_sdk::clob::types::response::{
+    use kuest_client_sdk::clob::types::response::{
         ApiKeysResponse, BalanceAllowanceResponse, BanStatusResponse, CancelOrdersResponse,
         CurrentRewardResponse, Earning, HeartbeatResponse, MakerOrder, MarketRewardResponse,
         MarketRewardsConfig, NotificationPayload, NotificationResponse, OpenOrderResponse,
         OrderScoringResponse, Page, PostOrderResponse, RewardsConfig, Token,
         TotalUserEarningResponse, TradeResponse, UserEarningResponse, UserRewardsEarningResponse,
     };
-    use polymarket_client_sdk::clob::types::{
+    use kuest_client_sdk::clob::types::{
         AssetType, OrderStatusType, OrderType, Side, SignableOrder, SignedOrder, TickSize,
         TraderSide,
     };
     #[cfg(feature = "heartbeats")]
-    use polymarket_client_sdk::error::Synchronization;
-    use polymarket_client_sdk::types::{Address, address, b256};
+    use kuest_client_sdk::error::Synchronization;
+    use kuest_client_sdk::types::{Address, address, b256};
 
     use super::*;
     use crate::common::{
-        API_KEY, PASSPHRASE, POLY_NONCE, POLY_SIGNATURE, POLY_TIMESTAMP, SECRET, SIGNATURE,
+        API_KEY, PASSPHRASE, KUEST_NONCE, KUEST_SIGNATURE, KUEST_TIMESTAMP, SECRET, SIGNATURE,
         TIMESTAMP,
     };
 
@@ -1331,9 +1331,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(GET)
                 .path("/auth/api-keys")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE);
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE);
             then.status(StatusCode::OK)
                 .json_body(json!({"apiKeys": [API_KEY]}));
         });
@@ -1356,9 +1356,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(DELETE)
                 .path("/auth/api-key")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE);
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE);
             then.status(StatusCode::OK).body("\"\"");
         });
 
@@ -1377,9 +1377,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(GET)
                 .path("/auth/ban-status/closed-only")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE);
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE);
             then.status(StatusCode::OK)
                 .json_body(json!({"closed_only": true}));
         });
@@ -1403,10 +1403,10 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(GET)
                 .path("/auth/derive-api-key")
-                .header(POLY_ADDRESS, signer.address().to_string().to_lowercase())
-                .header(POLY_NONCE, "0")
-                .header(POLY_SIGNATURE, SIGNATURE)
-                .header(POLY_TIMESTAMP, TIMESTAMP);
+                .header(KUEST_ADDRESS, signer.address().to_string().to_lowercase())
+                .header(KUEST_NONCE, "0")
+                .header(KUEST_SIGNATURE, SIGNATURE)
+                .header(KUEST_TIMESTAMP, TIMESTAMP);
             then.status(StatusCode::OK).json_body(json!({
                 "apiKey": API_KEY.to_string(),
                 "passphrase": PASSPHRASE,
@@ -1457,12 +1457,12 @@ mod authenticated {
             .post_only(false)
             .signature(Signature::new(
                 U256::from_str(
-                    "83481775348298569941382281649378839838022156673358335472613408323829135581822",
+                    "102807530499570849510059214384565822064606455380385899157731282085449909808140",
                 )?,
                 U256::from_str(
-                    "14700784935255652319392527293337942251542995764256618215552578034044377798980",
+                    "10415478046249649723188051688639377251513122271127949516558899502738156932233",
                 )?,
-                false,
+                true,
             ))
             .build();
 
@@ -1491,31 +1491,17 @@ mod authenticated {
 
         ensure_requirements(&server, "1", TickSize::Hundredth);
 
+        let signer = LocalSigner::from_str(PRIVATE_KEY)?.with_chain_id(Some(POLYGON));
+        let signed_order = client.sign(&signer, SignableOrder::default()).await?;
+        let expected_body = serde_json::to_value(&signed_order)?;
+
         let mock = server.mock(|when, then| {
             when.method(POST)
                 .path("/order")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
-                .json_body(json!({
-                    "order": {
-                        "expiration": "0",
-                        "feeRateBps": "0",
-                        "maker": Address::ZERO,
-                        "makerAmount": "0",
-                        "nonce": "0",
-                        "salt": 0,
-                        "side": Side::Buy,
-                        "signature": "0x0d18c04a653d89bf7375636adb7db69cffe362755960dc6ce8a0d46b04355b767958fae51c48e0e4b0908347442cb461e811d2f5a751303f7a8c1f75e17b3e701b",
-                        "signatureType": 0,
-                        "signer": Address::ZERO,
-                        "taker": Address::ZERO,
-                        "takerAmount": "0",
-                        "tokenId": "0"
-                    },
-                    "orderType": "FOK",
-                    "owner": "00000000-0000-0000-0000-000000000000"
-                }));
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
+                .json_body(expected_body.clone());
             then.status(StatusCode::OK).json_body(json!({
                 "error_msg": "",
                 "makingAmount": "",
@@ -1526,8 +1512,6 @@ mod authenticated {
             }));
         });
 
-        let signer = LocalSigner::from_str(PRIVATE_KEY)?.with_chain_id(Some(POLYGON));
-        let signed_order = client.sign(&signer, SignableOrder::default()).await?;
         let response = client.post_order(signed_order).await?;
 
         let expected = PostOrderResponse::builder()
@@ -1554,9 +1538,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(POST)
                 .path("/order")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE);
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE);
             then.status(StatusCode::OK).json_body(json!({
                 "error_msg": "",
                 "makingAmount": "100",
@@ -1618,9 +1602,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(GET)
                 .path("/data/order/1")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE);
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE);
             then.status(StatusCode::OK).json_body(json);
         });
 
@@ -1688,9 +1672,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(GET)
                 .path("/data/orders")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .query_param("id", "1");
             then.status(StatusCode::OK).json_body(json);
         });
@@ -1738,9 +1722,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(DELETE)
                 .path("/order")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .json_body(json!({ "orderId": "1" }));
             then.status(StatusCode::OK).json_body(json!({
                     "canceled": [],
@@ -1774,9 +1758,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(DELETE)
                 .path("/order")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .json_body(json!({ "orderId": "1" }));
             then.status(StatusCode::OK).json_body(json!({
                     "canceled": [],
@@ -1810,9 +1794,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(DELETE)
                 .path("/orders")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .json_body(json!(["1"]));
             then.status(StatusCode::OK).json_body(json!({
                     "canceled": ["1"]
@@ -1839,9 +1823,9 @@ mod authenticated {
 
         let mock = server.mock(|when, then| {
             when.method(DELETE)
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .path("/cancel-all");
             then.status(StatusCode::OK).json_body(json!({
                     "canceled": ["2"],
@@ -1876,9 +1860,9 @@ mod authenticated {
 
         let mock = server.mock(|when, then| {
             when.method(DELETE)
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .path("/cancel-market-orders");
             then.status(StatusCode::OK).json_body(json!({
                 "market": "m",
@@ -1908,9 +1892,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(GET)
                 .path("/data/trades")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .query_param("id", "1")
                 .query_param("market", "0x000000000000000000000000000000000000000000000000000000006d61726b");
 
@@ -2042,9 +2026,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(GET)
                 .path("/notifications")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .query_param("signature_type", (SignatureType::Eoa as u8).to_string());
             then.status(StatusCode::OK).json_body(json!([
                 {
@@ -2054,8 +2038,8 @@ mod authenticated {
                         "asset_id": "71321045679252212594626385532706912750332728571942532289631379312455583992563",
                         "condition_id": "0x5f65177b394277fd294cd75650044e32ba009a95022d88a0c1d565897d72f8f1",
                         "eventSlug": "will-trump-win-the-2024-iowa-caucus",
-                        "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/trump1+copy.png",
-                        "image": "https://polymarket-upload.s3.us-east-2.amazonaws.com/trump1+copy.png",
+                        "icon": "https://kuest-upload.s3.us-east-2.amazonaws.com/trump1+copy.png",
+                        "image": "https://kuest-upload.s3.us-east-2.amazonaws.com/trump1+copy.png",
                         "market": "0x5f65177b394277fd294cd75650044e32ba009a95022d88a0c1d565897d72f8f1",
                         "market_slug": "will-trump-win-the-2024-iowa-caucus",
                         "matched_size": "20",
@@ -2089,8 +2073,8 @@ mod authenticated {
                         "5f65177b394277fd294cd75650044e32ba009a95022d88a0c1d565897d72f8f1"
                     ))
                     .event_slug("will-trump-win-the-2024-iowa-caucus")
-                    .icon("https://polymarket-upload.s3.us-east-2.amazonaws.com/trump1+copy.png")
-                    .image("https://polymarket-upload.s3.us-east-2.amazonaws.com/trump1+copy.png")
+                    .icon("https://kuest-upload.s3.us-east-2.amazonaws.com/trump1+copy.png")
+                    .image("https://kuest-upload.s3.us-east-2.amazonaws.com/trump1+copy.png")
                     .market(b256!(
                         "5f65177b394277fd294cd75650044e32ba009a95022d88a0c1d565897d72f8f1"
                     ))
@@ -2130,9 +2114,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(DELETE)
                 .path("/notifications")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .query_param("ids", "1,2");
             then.status(StatusCode::OK).json_body(json!(null));
         });
@@ -2155,9 +2139,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(GET)
                 .path("/balance-allowance")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .query_param("asset_type", "COLLATERAL")
                 .query_param("token_id", "1")
                 .query_param("signature_type", "0");
@@ -2193,9 +2177,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(GET)
                 .path("/balance-allowance/update")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .query_param("asset_type", "COLLATERAL")
                 .query_param("token_id", "1")
                 .query_param("signature_type", "0");
@@ -2221,9 +2205,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(GET)
                 .path("/order-scoring")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .query_param("order_id", "1");
             then.status(StatusCode::OK).json_body(json!({
                 "scoring": true,
@@ -2248,9 +2232,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(POST)
                 .path("/orders-scoring")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .json_body(json!(["1"]));
             then.status(StatusCode::OK).json_body(json!(
                 { "1": true }
@@ -2276,9 +2260,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(GET)
                 .path("/rewards/user")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .query_param("date", date.to_string())
                 .query_param("signature_type", (SignatureType::Eoa as u8).to_string());
             then.status(StatusCode::OK).json_body(json!({
@@ -2331,9 +2315,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(GET)
                 .path("/rewards/user/total")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .query_param("date", date.to_string())
                 .query_param("signature_type", (SignatureType::Eoa as u8).to_string());
             then.status(StatusCode::OK).json_body(json!([{
@@ -2372,9 +2356,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(GET)
                 .path("/rewards/user/total")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .query_param("date", today.date_naive().to_string())
                 .query_param("order_by", "")
                 .query_param("position", "")
@@ -2520,9 +2504,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(GET)
                 .path("/rewards/user/percentages")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .query_param("signature_type", "0");
             then.status(StatusCode::OK).json_body(json!({ "1": 2 }));
         });
@@ -2545,9 +2529,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(GET)
                 .path("/rewards/markets/current")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE);
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE);
             then.status(StatusCode::OK).json_body(json!({
                 "data": [
                     {
@@ -2624,9 +2608,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(GET)
                 .path("/rewards/markets/1")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .query_param("next_cursor", "1");
             then.status(StatusCode::OK).json_body(json!({
                 "data": [
@@ -2754,9 +2738,9 @@ mod authenticated {
         let mock = server.mock(|when, then| {
             when.method(POST)
                 .path("/v1/heartbeats")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .json_body(json!({
                     "heartbeat_id": null
                 }));
@@ -2788,8 +2772,8 @@ mod authenticated {
         server.mock(|when, then| {
             when.method(POST)
                 .path("/v1/heartbeats")
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .json_body(json!({
                     "heartbeat_id": null
                 }));
@@ -2834,19 +2818,19 @@ mod builder_authenticated {
     use alloy::signers::Signer as _;
     use alloy::signers::local::LocalSigner;
     use httpmock::Method::DELETE;
-    use polymarket_client_sdk::auth::builder::Config as BuilderConfig;
-    use polymarket_client_sdk::clob::types::request::TradesRequest;
-    use polymarket_client_sdk::clob::types::response::{
+    use kuest_client_sdk::auth::builder::Config as BuilderConfig;
+    use kuest_client_sdk::clob::types::request::TradesRequest;
+    use kuest_client_sdk::clob::types::response::{
         BuilderApiKeyResponse, BuilderTradeResponse, Page,
     };
-    use polymarket_client_sdk::clob::types::{OrderStatusType, Side};
-    use polymarket_client_sdk::types::{address, b256};
+    use kuest_client_sdk::clob::types::{OrderStatusType, Side};
+    use kuest_client_sdk::types::{address, b256};
 
     use super::*;
     use crate::common::{
-        API_KEY, BUILDER_API_KEY, BUILDER_PASSPHRASE, PASSPHRASE, POLY_BUILDER_API_KEY,
-        POLY_BUILDER_PASSPHRASE, POLY_BUILDER_SIGNATURE, POLY_BUILDER_TIMESTAMP, POLY_NONCE,
-        POLY_SIGNATURE, POLY_TIMESTAMP, SECRET, SIGNATURE, TIMESTAMP,
+        API_KEY, BUILDER_API_KEY, BUILDER_PASSPHRASE, PASSPHRASE, KUEST_BUILDER_API_KEY,
+        KUEST_BUILDER_PASSPHRASE, KUEST_BUILDER_SIGNATURE, KUEST_BUILDER_TIMESTAMP, KUEST_NONCE,
+        KUEST_SIGNATURE, KUEST_TIMESTAMP, SECRET, SIGNATURE, TIMESTAMP,
     };
 
     #[tokio::test]
@@ -2858,10 +2842,10 @@ mod builder_authenticated {
         let mock = server.mock(|when, then| {
             when.method(httpmock::Method::GET)
                 .path("/auth/derive-api-key")
-                .header(POLY_ADDRESS, signer.address().to_string().to_lowercase())
-                .header(POLY_NONCE, "0")
-                .header(POLY_SIGNATURE, SIGNATURE)
-                .header(POLY_TIMESTAMP, TIMESTAMP);
+                .header(KUEST_ADDRESS, signer.address().to_string().to_lowercase())
+                .header(KUEST_NONCE, "0")
+                .header(KUEST_SIGNATURE, SIGNATURE)
+                .header(KUEST_TIMESTAMP, TIMESTAMP);
             then.status(StatusCode::OK).json_body(json!({
                 "apiKey": API_KEY,
                 "passphrase": PASSPHRASE,
@@ -2889,10 +2873,10 @@ mod builder_authenticated {
                 .header("authorization", "Bearer token");
 
             then.status(StatusCode::OK).json_body(json!({
-                POLY_BUILDER_API_KEY: BUILDER_API_KEY,
-                POLY_BUILDER_PASSPHRASE: BUILDER_PASSPHRASE,
-                POLY_BUILDER_SIGNATURE: "signature",
-                POLY_BUILDER_TIMESTAMP: "1",
+                KUEST_BUILDER_API_KEY: BUILDER_API_KEY,
+                KUEST_BUILDER_PASSPHRASE: BUILDER_PASSPHRASE,
+                KUEST_BUILDER_SIGNATURE: "signature",
+                KUEST_BUILDER_TIMESTAMP: "1",
             }));
         });
 
@@ -2900,13 +2884,13 @@ mod builder_authenticated {
         let mock4 = server.mock(|when, then| {
             when.method(httpmock::Method::GET)
                 .path("/auth/builder-api-key")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
-                .header(POLY_BUILDER_API_KEY, BUILDER_API_KEY)
-                .header(POLY_BUILDER_PASSPHRASE, BUILDER_PASSPHRASE)
-                .header(POLY_BUILDER_SIGNATURE, "signature")
-                .header(POLY_BUILDER_TIMESTAMP, "1");
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_BUILDER_API_KEY, BUILDER_API_KEY)
+                .header(KUEST_BUILDER_PASSPHRASE, BUILDER_PASSPHRASE)
+                .header(KUEST_BUILDER_SIGNATURE, "signature")
+                .header(KUEST_BUILDER_TIMESTAMP, "1");
 
             then.status(StatusCode::OK).json_body(json!(
                 [
@@ -2945,10 +2929,10 @@ mod builder_authenticated {
         let mock = server.mock(|when, then| {
             when.method(httpmock::Method::GET)
                 .path("/auth/derive-api-key")
-                .header(POLY_ADDRESS, signer.address().to_string().to_lowercase())
-                .header(POLY_NONCE, "0")
-                .header(POLY_SIGNATURE, SIGNATURE)
-                .header(POLY_TIMESTAMP, TIMESTAMP);
+                .header(KUEST_ADDRESS, signer.address().to_string().to_lowercase())
+                .header(KUEST_NONCE, "0")
+                .header(KUEST_SIGNATURE, SIGNATURE)
+                .header(KUEST_TIMESTAMP, TIMESTAMP);
             then.status(StatusCode::OK).json_body(json!({
                 "apiKey": API_KEY,
                 "passphrase": PASSPHRASE,
@@ -2976,23 +2960,23 @@ mod builder_authenticated {
                 .header("authorization", "Bearer token");
 
             then.status(StatusCode::OK).json_body(json!({
-                POLY_BUILDER_API_KEY: BUILDER_API_KEY,
-                POLY_BUILDER_PASSPHRASE: BUILDER_PASSPHRASE,
-                POLY_BUILDER_SIGNATURE: "signature",
-                POLY_BUILDER_TIMESTAMP: "1",
+                KUEST_BUILDER_API_KEY: BUILDER_API_KEY,
+                KUEST_BUILDER_PASSPHRASE: BUILDER_PASSPHRASE,
+                KUEST_BUILDER_SIGNATURE: "signature",
+                KUEST_BUILDER_TIMESTAMP: "1",
             }));
         });
 
         let mock4 = server.mock(|when, then| {
             when.method(DELETE)
                 .path("/auth/builder-api-key")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
-                .header(POLY_BUILDER_API_KEY, BUILDER_API_KEY)
-                .header(POLY_BUILDER_PASSPHRASE, BUILDER_PASSPHRASE)
-                .header(POLY_BUILDER_SIGNATURE, "signature")
-                .header(POLY_BUILDER_TIMESTAMP, "1");
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_BUILDER_API_KEY, BUILDER_API_KEY)
+                .header(KUEST_BUILDER_PASSPHRASE, BUILDER_PASSPHRASE)
+                .header(KUEST_BUILDER_SIGNATURE, "signature")
+                .header(KUEST_BUILDER_TIMESTAMP, "1");
             then.status(StatusCode::OK).json_body(json!(null));
         });
 
@@ -3015,10 +2999,10 @@ mod builder_authenticated {
         let mock = server.mock(|when, then| {
             when.method(httpmock::Method::GET)
                 .path("/auth/derive-api-key")
-                .header(POLY_ADDRESS, signer.address().to_string().to_lowercase())
-                .header(POLY_NONCE, "0")
-                .header(POLY_SIGNATURE, SIGNATURE)
-                .header(POLY_TIMESTAMP, TIMESTAMP);
+                .header(KUEST_ADDRESS, signer.address().to_string().to_lowercase())
+                .header(KUEST_NONCE, "0")
+                .header(KUEST_SIGNATURE, SIGNATURE)
+                .header(KUEST_TIMESTAMP, TIMESTAMP);
             then.status(StatusCode::OK).json_body(json!({
                 "apiKey": API_KEY,
                 "passphrase": PASSPHRASE,
@@ -3046,23 +3030,23 @@ mod builder_authenticated {
                 .header("authorization", "Bearer token");
 
             then.status(StatusCode::OK).json_body(json!({
-                POLY_BUILDER_API_KEY: BUILDER_API_KEY,
-                POLY_BUILDER_PASSPHRASE: BUILDER_PASSPHRASE,
-                POLY_BUILDER_SIGNATURE: "signature",
-                POLY_BUILDER_TIMESTAMP: "1",
+                KUEST_BUILDER_API_KEY: BUILDER_API_KEY,
+                KUEST_BUILDER_PASSPHRASE: BUILDER_PASSPHRASE,
+                KUEST_BUILDER_SIGNATURE: "signature",
+                KUEST_BUILDER_TIMESTAMP: "1",
             }));
         });
 
         let mock4 = server.mock(|when, then| {
             when.method(httpmock::Method::GET)
                 .path("/builder/trades")
-                .header(POLY_ADDRESS, client.address().to_string().to_lowercase())
-                .header(POLY_API_KEY, API_KEY)
-                .header(POLY_PASSPHRASE, PASSPHRASE)
-                .header(POLY_BUILDER_API_KEY, BUILDER_API_KEY)
-                .header(POLY_BUILDER_PASSPHRASE, BUILDER_PASSPHRASE)
-                .header(POLY_BUILDER_SIGNATURE, "signature")
-                .header(POLY_BUILDER_TIMESTAMP, "1")
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE)
+                .header(KUEST_BUILDER_API_KEY, BUILDER_API_KEY)
+                .header(KUEST_BUILDER_PASSPHRASE, BUILDER_PASSPHRASE)
+                .header(KUEST_BUILDER_SIGNATURE, "signature")
+                .header(KUEST_BUILDER_TIMESTAMP, "1")
                 .query_param("id", "1")
                 .query_param("market", "0x000000000000000000000000000000000000000000000000000000006d61726b");
 

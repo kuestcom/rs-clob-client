@@ -1,6 +1,6 @@
 #![cfg(feature = "data")]
 
-use polymarket_client_sdk::types::{Address, B256, address, b256};
+use kuest_client_sdk::types::{Address, B256, address, b256};
 
 const TEST_USER: Address = address!("1234567890abcdef1234567890abcdef12345678");
 const TEST_CONDITION_ID: B256 =
@@ -16,7 +16,7 @@ fn test_condition_id() -> B256 {
 
 mod health {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::Client;
+    use kuest_client_sdk::data::Client;
     use reqwest::StatusCode;
     use serde_json::json;
 
@@ -43,7 +43,7 @@ mod health {
 
 mod positions {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{Client, types::request::PositionsRequest};
+    use kuest_client_sdk::data::{Client, types::request::PositionsRequest};
     use reqwest::StatusCode;
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -139,7 +139,7 @@ mod positions {
 
 mod trades {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{Client, types::Side, types::request::TradesRequest};
+    use kuest_client_sdk::data::{Client, types::Side, types::request::TradesRequest};
     use reqwest::StatusCode;
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -196,7 +196,7 @@ mod trades {
 
 mod activity {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{
+    use kuest_client_sdk::data::{
         Client,
         types::request::ActivityRequest,
         types::{ActivityType, Side},
@@ -262,7 +262,7 @@ mod activity {
 
 mod holders {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{Client, types::request::HoldersRequest};
+    use kuest_client_sdk::data::{Client, types::request::HoldersRequest};
     use reqwest::StatusCode;
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -334,7 +334,7 @@ mod holders {
 
 mod value {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{Client, types::request::ValueRequest};
+    use kuest_client_sdk::data::{Client, types::request::ValueRequest};
     use reqwest::StatusCode;
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -373,7 +373,7 @@ mod value {
 
 mod closed_positions {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{Client, types::request::ClosedPositionsRequest};
+    use kuest_client_sdk::data::{Client, types::request::ClosedPositionsRequest};
     use reqwest::StatusCode;
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -430,7 +430,7 @@ mod closed_positions {
 
 mod leaderboard {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{
+    use kuest_client_sdk::data::{
         Client,
         types::request::TraderLeaderboardRequest,
         types::{LeaderboardCategory, LeaderboardOrderBy, TimePeriod},
@@ -521,7 +521,7 @@ mod leaderboard {
 
 mod traded {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{Client, types::request::TradedRequest};
+    use kuest_client_sdk::data::{Client, types::request::TradedRequest};
     use reqwest::StatusCode;
     use serde_json::json;
 
@@ -556,7 +556,7 @@ mod traded {
 
 mod open_interest {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{Client, types::request::OpenInterestRequest};
+    use kuest_client_sdk::data::{Client, types::request::OpenInterestRequest};
     use reqwest::StatusCode;
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -638,7 +638,7 @@ mod open_interest {
 
 mod live_volume {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{Client, types::request::LiveVolumeRequest};
+    use kuest_client_sdk::data::{Client, types::request::LiveVolumeRequest};
     use reqwest::StatusCode;
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -694,7 +694,7 @@ mod live_volume {
 
 mod builder_leaderboard {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{
+    use kuest_client_sdk::data::{
         Client, types::TimePeriod, types::request::BuilderLeaderboardRequest,
     };
     use reqwest::StatusCode;
@@ -771,7 +771,7 @@ mod builder_leaderboard {
 
 mod builder_volume {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{
+    use kuest_client_sdk::data::{
         Client, types::TimePeriod, types::request::BuilderVolumeRequest,
     };
     use reqwest::StatusCode;
@@ -848,8 +848,8 @@ mod builder_volume {
 
 mod error_handling {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{Client, types::request::PositionsRequest};
-    use polymarket_client_sdk::error::Kind;
+    use kuest_client_sdk::data::{Client, types::request::PositionsRequest};
+    use kuest_client_sdk::error::Kind;
     use reqwest::StatusCode;
     use serde_json::json;
 
@@ -928,12 +928,12 @@ mod error_handling {
 }
 
 mod client {
-    use polymarket_client_sdk::data::Client;
+    use kuest_client_sdk::data::Client;
 
     #[test]
     fn client_default_should_succeed() {
         let client = Client::default();
-        assert_eq!(client.host().as_str(), "https://data-api.polymarket.com/");
+        assert_eq!(client.host().as_str(), "https://data-api.kuest.com/");
     }
 
     #[test]
@@ -950,8 +950,8 @@ mod client {
 }
 
 mod types {
-    use polymarket_client_sdk::ToQueryParams as _;
-    use polymarket_client_sdk::data::{
+    use kuest_client_sdk::ToQueryParams as _;
+    use kuest_client_sdk::data::{
         types::request::{
             ActivityRequest, BuilderLeaderboardRequest, HoldersRequest, LiveVolumeRequest,
             PositionsRequest, TradedRequest, TraderLeaderboardRequest, TradesRequest,
@@ -1163,7 +1163,7 @@ mod types {
 
     #[test]
     fn all_activity_types_display() {
-        use polymarket_client_sdk::data::types::ActivityType;
+        use kuest_client_sdk::data::types::ActivityType;
         assert_eq!(ActivityType::Split.to_string(), "SPLIT");
         assert_eq!(ActivityType::Merge.to_string(), "MERGE");
         assert_eq!(ActivityType::Redeem.to_string(), "REDEEM");
@@ -1214,7 +1214,7 @@ mod types {
 }
 
 mod error_display {
-    use polymarket_client_sdk::data::{types::TradeFilter, types::request::PositionsRequest};
+    use kuest_client_sdk::data::{types::TradeFilter, types::request::PositionsRequest};
     use rust_decimal_macros::dec;
 
     use super::address;
@@ -1239,8 +1239,8 @@ mod error_display {
 }
 
 mod request_query_string_extended {
-    use polymarket_client_sdk::ToQueryParams as _;
-    use polymarket_client_sdk::data::types::{
+    use kuest_client_sdk::ToQueryParams as _;
+    use kuest_client_sdk::data::types::{
         ActivitySortBy, ClosedPositionSortBy, MarketFilter, PositionSortBy, Side, SortDirection,
         TradeFilter,
         request::{
@@ -1451,7 +1451,7 @@ mod request_query_string_extended {
 
     #[test]
     fn closed_position_sort_by_variants() {
-        use polymarket_client_sdk::data::types::ClosedPositionSortBy;
+        use kuest_client_sdk::data::types::ClosedPositionSortBy;
         assert_eq!(ClosedPositionSortBy::Title.to_string(), "TITLE");
         assert_eq!(ClosedPositionSortBy::Price.to_string(), "PRICE");
         assert_eq!(ClosedPositionSortBy::AvgPrice.to_string(), "AVGPRICE");
@@ -1466,7 +1466,7 @@ mod request_query_string_extended {
 
     #[test]
     fn filter_type_display() {
-        use polymarket_client_sdk::data::types::FilterType;
+        use kuest_client_sdk::data::types::FilterType;
         assert_eq!(FilterType::Cash.to_string(), "CASH");
         assert_eq!(FilterType::Tokens.to_string(), "TOKENS");
     }

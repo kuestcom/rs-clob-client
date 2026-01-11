@@ -3,7 +3,7 @@
 //! **Feature flag:** `ctf` (required to use this module)
 //!
 //! The Conditional Token Framework is Gnosis's smart contract system that tokenizes
-//! all Polymarket outcomes as binary ERC1155 tokens on Polygon. Each market has two
+//! all Kuest outcomes as binary ERC1155 tokens on Polygon. Each market has two
 //! outcome tokens ("YES" and "NO") backed by USDC collateral.
 //!
 //! # Features
@@ -16,9 +16,9 @@
 //! # Example
 //!
 //! ```ignore
-//! use polymarket_client_sdk::ctf::{Client, types::*};
-//! use polymarket_client_sdk::types::address;
-//! use polymarket_client_sdk::POLYGON;
+//! use kuest_client_sdk::ctf::{Client, types::*};
+//! use kuest_client_sdk::types::address;
+//! use kuest_client_sdk::POLYGON;
 //! use alloy::providers::ProviderBuilder;
 //! use alloy::primitives::{B256, U256};
 //!
@@ -60,7 +60,7 @@
 //!
 //! # Resources
 //!
-//! - [CTF Documentation](https://docs.polymarket.com/developers/CTF/overview)
+//! - [CTF Documentation](https://docs.kuest.com/developers/CTF/overview)
 //! - [Gnosis CTF Source Code](https://github.com/gnosis/conditional-tokens-contracts)
 
 pub mod client;

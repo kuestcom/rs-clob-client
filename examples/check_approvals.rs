@@ -3,7 +3,7 @@
 #![allow(clippy::print_stderr, reason = "Usage message to stderr")]
 #![allow(clippy::unwrap_used, reason = "Examples use unwrap for brevity")]
 
-//! Read-only example to check current token approvals for Polymarket CLOB trading.
+//! Read-only example to check current token approvals for Kuest CLOB trading.
 //!
 //! This example queries the blockchain to show which contracts are approved
 //! for a given wallet address. No private key or gas required.
@@ -29,16 +29,14 @@ use std::fs::File;
 use alloy::primitives::U256;
 use alloy::providers::ProviderBuilder;
 use alloy::sol;
-use polymarket_client_sdk::types::{Address, address};
-use polymarket_client_sdk::{POLYGON, contract_config};
+use kuest_client_sdk::types::Address;
+use kuest_client_sdk::{POLYGON, contract_config};
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt as _;
 use tracing_subscriber::util::SubscriberInitExt as _;
 
 const RPC_URL: &str = "https://polygon-rpc.com";
-
-const USDC_ADDRESS: Address = address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174");
 
 sol! {
     #[sol(rpc)]
@@ -91,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
     let config = contract_config(POLYGON, false).unwrap();
     let neg_risk_config = contract_config(POLYGON, true).unwrap();
 
-    let usdc = IERC20::new(USDC_ADDRESS, provider.clone());
+    let usdc = IERC20::new(config.collateral, provider.clone());
     let ctf = IERC1155::new(config.conditional_tokens, provider.clone());
 
     // All contracts that need approval for full CLOB trading

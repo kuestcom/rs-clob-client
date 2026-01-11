@@ -4,14 +4,14 @@
 use alloy::primitives::{B256, U256};
 use alloy::providers::ProviderBuilder;
 use httpmock::{Method::POST, MockServer};
-use polymarket_client_sdk::POLYGON;
-use polymarket_client_sdk::ctf::Client;
-use polymarket_client_sdk::types::address;
+use kuest_client_sdk::POLYGON;
+use kuest_client_sdk::ctf::Client;
+use kuest_client_sdk::types::address;
 use serde_json::json;
 
 mod contract_calls {
     use alloy::primitives::b256;
-    use polymarket_client_sdk::ctf::types::{
+    use kuest_client_sdk::ctf::types::{
         CollectionIdRequest, ConditionIdRequest, PositionIdRequest,
     };
 
@@ -135,7 +135,7 @@ mod client_creation {
         let server = MockServer::start();
         let provider = ProviderBuilder::new().connect(&server.base_url()).await?;
 
-        let client = Client::new(provider, polymarket_client_sdk::AMOY);
+        let client = Client::new(provider, kuest_client_sdk::AMOY);
         client.unwrap();
 
         Ok(())
@@ -154,7 +154,7 @@ mod client_creation {
 }
 
 mod request_builders {
-    use polymarket_client_sdk::ctf::types::{
+    use kuest_client_sdk::ctf::types::{
         ConditionIdRequest, MergePositionsRequest, RedeemPositionsRequest, SplitPositionRequest,
     };
 
@@ -220,7 +220,7 @@ mod request_builders {
 }
 
 mod binary_market_convenience_methods {
-    use polymarket_client_sdk::ctf::types::{
+    use kuest_client_sdk::ctf::types::{
         MergePositionsRequest, RedeemPositionsRequest, SplitPositionRequest,
     };
 
@@ -269,7 +269,7 @@ mod binary_market_convenience_methods {
 }
 
 mod neg_risk {
-    use polymarket_client_sdk::ctf::types::RedeemNegRiskRequest;
+    use kuest_client_sdk::ctf::types::RedeemNegRiskRequest;
 
     use super::*;
 

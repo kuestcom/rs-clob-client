@@ -15,12 +15,12 @@ use alloy::signers::Signer as _;
 use alloy::signers::k256::ecdsa::SigningKey;
 use alloy::signers::local::LocalSigner;
 use httpmock::MockServer;
-use polymarket_client_sdk::POLYGON;
-use polymarket_client_sdk::auth::Normal;
-use polymarket_client_sdk::auth::state::Authenticated;
-use polymarket_client_sdk::clob::types::{SignatureType, TickSize};
-use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::types::Decimal;
+use kuest_client_sdk::POLYGON;
+use kuest_client_sdk::auth::Normal;
+use kuest_client_sdk::auth::state::Authenticated;
+use kuest_client_sdk::clob::types::{SignatureType, TickSize};
+use kuest_client_sdk::clob::{Client, Config};
+use kuest_client_sdk::types::Decimal;
 use reqwest::StatusCode;
 use serde_json::json;
 use uuid::Uuid;
@@ -36,17 +36,17 @@ pub const TIMESTAMP: &str = "100000";
 pub const BUILDER_PASSPHRASE: &str = "passphrase";
 pub const TOKEN_1: &str = "1";
 
-pub const POLY_ADDRESS: &str = "POLY_ADDRESS";
-pub const POLY_API_KEY: &str = "POLY_API_KEY";
-pub const POLY_NONCE: &str = "POLY_NONCE";
-pub const POLY_PASSPHRASE: &str = "POLY_PASSPHRASE";
-pub const POLY_SIGNATURE: &str = "POLY_SIGNATURE";
-pub const POLY_TIMESTAMP: &str = "POLY_TIMESTAMP";
+pub const KUEST_ADDRESS: &str = "KUEST_ADDRESS";
+pub const KUEST_API_KEY: &str = "KUEST_API_KEY";
+pub const KUEST_NONCE: &str = "KUEST_NONCE";
+pub const KUEST_PASSPHRASE: &str = "KUEST_PASSPHRASE";
+pub const KUEST_SIGNATURE: &str = "KUEST_SIGNATURE";
+pub const KUEST_TIMESTAMP: &str = "KUEST_TIMESTAMP";
 
-pub const POLY_BUILDER_API_KEY: &str = "POLY_BUILDER_API_KEY";
-pub const POLY_BUILDER_PASSPHRASE: &str = "POLY_BUILDER_PASSPHRASE";
-pub const POLY_BUILDER_SIGNATURE: &str = "POLY_BUILDER_SIGNATURE";
-pub const POLY_BUILDER_TIMESTAMP: &str = "POLY_BUILDER_TIMESTAMP";
+pub const KUEST_BUILDER_API_KEY: &str = "KUEST_BUILDER_API_KEY";
+pub const KUEST_BUILDER_PASSPHRASE: &str = "KUEST_BUILDER_PASSPHRASE";
+pub const KUEST_BUILDER_SIGNATURE: &str = "KUEST_BUILDER_SIGNATURE";
+pub const KUEST_BUILDER_TIMESTAMP: &str = "KUEST_BUILDER_TIMESTAMP";
 
 pub const API_KEY: Uuid = Uuid::nil();
 pub const BUILDER_API_KEY: Uuid = Uuid::max();
@@ -61,10 +61,10 @@ pub async fn create_authenticated(server: &MockServer) -> anyhow::Result<TestCli
     let mock = server.mock(|when, then| {
         when.method(httpmock::Method::GET)
             .path("/auth/derive-api-key")
-            .header(POLY_ADDRESS, signer.address().to_string().to_lowercase())
-            .header(POLY_NONCE, "0")
-            .header(POLY_SIGNATURE, SIGNATURE)
-            .header(POLY_TIMESTAMP, TIMESTAMP);
+            .header(KUEST_ADDRESS, signer.address().to_string().to_lowercase())
+            .header(KUEST_NONCE, "0")
+            .header(KUEST_SIGNATURE, SIGNATURE)
+            .header(KUEST_TIMESTAMP, TIMESTAMP);
         then.status(StatusCode::OK).json_body(json!({
             "apiKey": API_KEY.to_string(),
             "passphrase": PASSPHRASE,

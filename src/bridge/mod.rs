@@ -1,10 +1,10 @@
-//! Polymarket Bridge API client and types.
+//! Kuest Bridge API client and types.
 //!
 //! **Feature flag:** `bridge` (required to use this module)
 //!
-//! This module provides a client for interacting with the Polymarket Bridge API,
+//! This module provides a client for interacting with the Kuest Bridge API,
 //! which enables bridging assets from various chains (EVM, Solana, Bitcoin) to
-//! USDC.e on Polygon for trading on Polymarket.
+//! USDC.e on Polygon for trading on Kuest.
 //!
 //! # Overview
 //!
@@ -22,8 +22,8 @@
 //! # Example
 //!
 //! ```no_run
-//! use polymarket_client_sdk::types::address;
-//! use polymarket_client_sdk::bridge::{Client, types::DepositRequest};
+//! use kuest_client_sdk::types::address;
+//! use kuest_client_sdk::bridge::{Client, types::DepositRequest};
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create a client with the default endpoint
@@ -44,7 +44,7 @@
 //!
 //! # API Base URL
 //!
-//! The default API endpoint is `https://bridge.polymarket.com`.
+//! The default API endpoint is `https://bridge.kuest.com/#disabled`.
 
 pub mod client;
 pub mod types;

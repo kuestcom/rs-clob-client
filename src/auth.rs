@@ -23,7 +23,7 @@ use crate::{Result, Timestamp};
 /// Type alias for API keys, which are UUIDs.
 pub type ApiKey = Uuid;
 
-/// Generic set of credentials used to authenticate to the Polymarket API. These credentials are
+/// Generic set of credentials used to authenticate to the Kuest API. These credentials are
 /// returned when calling [`crate::clob::Client::create_or_derive_api_key`], [`crate::clob::Client::derive_api_key`], or
 /// [`crate::clob::Client::create_api_key`]. They are used by the [`state::Authenticated`] client to
 /// sign the [`Request`] when making calls to the API.
@@ -90,7 +90,7 @@ pub mod state {
         /// The signer's address that created the credentials
         pub(crate) address: Address,
         /// The [`Credentials`]'s `secret` is used to generate an [`crate::signer::hmac`] which is
-        /// passed in the L2 headers ([`super::HeaderMap`]) `POLY_SIGNATURE` field.
+        /// passed in the L2 headers ([`super::HeaderMap`]) `KUEST_SIGNATURE` field.
         pub(crate) credentials: Credentials,
         /// The [`Kind`] that this [`Authenticated`] exhibits. Used to generate additional headers
         /// for different types of authentication, e.g. Builder.
@@ -162,10 +162,10 @@ pub(crate) mod l1 {
 
     use crate::{Result, Timestamp};
 
-    pub(crate) const POLY_ADDRESS: &str = "POLY_ADDRESS";
-    pub(crate) const POLY_NONCE: &str = "POLY_NONCE";
-    pub(crate) const POLY_SIGNATURE: &str = "POLY_SIGNATURE";
-    pub(crate) const POLY_TIMESTAMP: &str = "POLY_TIMESTAMP";
+    pub(crate) const KUEST_ADDRESS: &str = "KUEST_ADDRESS";
+    pub(crate) const KUEST_NONCE: &str = "KUEST_NONCE";
+    pub(crate) const KUEST_SIGNATURE: &str = "KUEST_SIGNATURE";
+    pub(crate) const KUEST_TIMESTAMP: &str = "KUEST_TIMESTAMP";
 
     sol! {
         #[non_exhaustive]
@@ -205,12 +205,12 @@ pub(crate) mod l1 {
 
         let mut map = HeaderMap::new();
         map.insert(
-            POLY_ADDRESS,
+            KUEST_ADDRESS,
             signer.address().encode_hex_with_prefix().parse()?,
         );
-        map.insert(POLY_NONCE, naive_nonce.to_string().parse()?);
-        map.insert(POLY_SIGNATURE, signature.to_string().parse()?);
-        map.insert(POLY_TIMESTAMP, timestamp.to_string().parse()?);
+        map.insert(KUEST_NONCE, naive_nonce.to_string().parse()?);
+        map.insert(KUEST_SIGNATURE, signature.to_string().parse()?);
+        map.insert(KUEST_TIMESTAMP, timestamp.to_string().parse()?);
 
         Ok(map)
     }
@@ -227,11 +227,11 @@ pub(crate) mod l2 {
     use crate::auth::{Kind, hmac, to_message};
     use crate::{Result, Timestamp};
 
-    pub(crate) const POLY_ADDRESS: &str = "POLY_ADDRESS";
-    pub(crate) const POLY_API_KEY: &str = "POLY_API_KEY";
-    pub(crate) const POLY_PASSPHRASE: &str = "POLY_PASSPHRASE";
-    pub(crate) const POLY_SIGNATURE: &str = "POLY_SIGNATURE";
-    pub(crate) const POLY_TIMESTAMP: &str = "POLY_TIMESTAMP";
+    pub(crate) const KUEST_ADDRESS: &str = "KUEST_ADDRESS";
+    pub(crate) const KUEST_API_KEY: &str = "KUEST_API_KEY";
+    pub(crate) const KUEST_PASSPHRASE: &str = "KUEST_PASSPHRASE";
+    pub(crate) const KUEST_SIGNATURE: &str = "KUEST_SIGNATURE";
+    pub(crate) const KUEST_TIMESTAMP: &str = "KUEST_TIMESTAMP";
 
     /// Returns the [`Headers`] needed to interact with any authenticated endpoints.
     pub(crate) async fn create_headers<K: Kind>(
@@ -245,16 +245,16 @@ pub(crate) mod l2 {
         let mut map = HeaderMap::new();
 
         map.insert(
-            POLY_ADDRESS,
+            KUEST_ADDRESS,
             state.address.encode_hex_with_prefix().parse()?,
         );
-        map.insert(POLY_API_KEY, state.credentials.key.to_string().parse()?);
+        map.insert(KUEST_API_KEY, state.credentials.key.to_string().parse()?);
         map.insert(
-            POLY_PASSPHRASE,
+            KUEST_PASSPHRASE,
             state.credentials.passphrase.expose_secret().parse()?,
         );
-        map.insert(POLY_SIGNATURE, signature.parse()?);
-        map.insert(POLY_TIMESTAMP, timestamp.to_string().parse()?);
+        map.insert(KUEST_SIGNATURE, signature.parse()?);
+        map.insert(KUEST_TIMESTAMP, timestamp.to_string().parse()?);
 
         let extra_headers = state.kind.extra_headers(request, timestamp).await?;
 
@@ -277,25 +277,25 @@ pub mod builder {
     use crate::auth::{Credentials, body_to_string, hmac, to_message};
     use crate::{Result, Timestamp};
 
-    pub(crate) const POLY_BUILDER_API_KEY: &str = "POLY_BUILDER_API_KEY";
-    pub(crate) const POLY_BUILDER_PASSPHRASE: &str = "POLY_BUILDER_PASSPHRASE";
-    pub(crate) const POLY_BUILDER_SIGNATURE: &str = "POLY_BUILDER_SIGNATURE";
-    pub(crate) const POLY_BUILDER_TIMESTAMP: &str = "POLY_BUILDER_TIMESTAMP";
+    pub(crate) const KUEST_BUILDER_API_KEY: &str = "KUEST_BUILDER_API_KEY";
+    pub(crate) const KUEST_BUILDER_PASSPHRASE: &str = "KUEST_BUILDER_PASSPHRASE";
+    pub(crate) const KUEST_BUILDER_SIGNATURE: &str = "KUEST_BUILDER_SIGNATURE";
+    pub(crate) const KUEST_BUILDER_TIMESTAMP: &str = "KUEST_BUILDER_TIMESTAMP";
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
     #[serde(rename_all = "UPPERCASE")]
     #[expect(
         clippy::struct_field_names,
-        reason = "Have to prefix `poly_builder` for serde"
+        reason = "Have to prefix `kuest_builder` for serde"
     )]
     struct HeaderPayload {
-        poly_builder_api_key: String,
-        poly_builder_timestamp: String,
-        poly_builder_passphrase: String,
-        poly_builder_signature: String,
+        kuest_builder_api_key: String,
+        kuest_builder_timestamp: String,
+        kuest_builder_passphrase: String,
+        kuest_builder_signature: String,
     }
 
-    /// Configuration used to authenticate as a [Builder](https://docs.polymarket.com/developers/builders/builder-intro). Can either be [`Config::local`]
+    /// Configuration used to authenticate as a [Builder](https://docs.kuest.com/developers/builders/builder-intro). Can either be [`Config::local`]
     /// or [`Config::remote`]. Local uses locally accessible Builder credentials to generate builder headers. Remote obtains them from a signing server
     #[non_exhaustive]
     #[derive(Clone, Debug)]
@@ -336,13 +336,13 @@ pub mod builder {
 
                     let mut map = HeaderMap::new();
 
-                    map.insert(POLY_BUILDER_API_KEY, credentials.key.to_string().parse()?);
+                    map.insert(KUEST_BUILDER_API_KEY, credentials.key.to_string().parse()?);
                     map.insert(
-                        POLY_BUILDER_PASSPHRASE,
+                        KUEST_BUILDER_PASSPHRASE,
                         credentials.passphrase.expose_secret().parse()?,
                     );
-                    map.insert(POLY_BUILDER_SIGNATURE, signature.parse()?);
-                    map.insert(POLY_BUILDER_TIMESTAMP, timestamp.to_string().parse()?);
+                    map.insert(KUEST_BUILDER_SIGNATURE, signature.parse()?);
+                    map.insert(KUEST_BUILDER_TIMESTAMP, timestamp.to_string().parse()?);
 
                     Ok(map)
                 }
@@ -372,20 +372,20 @@ pub mod builder {
                     let mut map = HeaderMap::new();
 
                     map.insert(
-                        POLY_BUILDER_SIGNATURE,
-                        remote_headers.poly_builder_signature.parse()?,
+                        KUEST_BUILDER_SIGNATURE,
+                        remote_headers.kuest_builder_signature.parse()?,
                     );
                     map.insert(
-                        POLY_BUILDER_TIMESTAMP,
-                        remote_headers.poly_builder_timestamp.parse()?,
+                        KUEST_BUILDER_TIMESTAMP,
+                        remote_headers.kuest_builder_timestamp.parse()?,
                     );
                     map.insert(
-                        POLY_BUILDER_API_KEY,
-                        remote_headers.poly_builder_api_key.parse()?,
+                        KUEST_BUILDER_API_KEY,
+                        remote_headers.kuest_builder_api_key.parse()?,
                     );
                     map.insert(
-                        POLY_BUILDER_PASSPHRASE,
-                        remote_headers.poly_builder_passphrase.parse()?,
+                        KUEST_BUILDER_PASSPHRASE,
+                        remote_headers.kuest_builder_passphrase.parse()?,
                     );
 
                     Ok(map)
@@ -456,15 +456,15 @@ mod tests {
             address!("0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266")
         );
         assert_eq!(
-            headers[l1::POLY_ADDRESS],
+            headers[l1::KUEST_ADDRESS],
             "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
         );
-        assert_eq!(headers[l1::POLY_NONCE], "23");
+        assert_eq!(headers[l1::KUEST_NONCE], "23");
         assert_eq!(
-            headers[l1::POLY_SIGNATURE],
+            headers[l1::KUEST_SIGNATURE],
             "0xf62319a987514da40e57e2f4d7529f7bac38f0355bd88bb5adbb3768d80de6c1682518e0af677d5260366425f4361e7b70c25ae232aff0ab2331e2b164a1aedc1b"
         );
-        assert_eq!(headers[l1::POLY_TIMESTAMP], "10000000");
+        assert_eq!(headers[l1::KUEST_TIMESTAMP], "10000000");
 
         Ok(())
     }
@@ -492,19 +492,19 @@ mod tests {
         let headers = l2::create_headers(&authenticated, &request, 1).await?;
 
         assert_eq!(
-            headers[l2::POLY_ADDRESS],
+            headers[l2::KUEST_ADDRESS],
             "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
         );
         assert_eq!(
-            headers[l2::POLY_PASSPHRASE],
+            headers[l2::KUEST_PASSPHRASE],
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         );
-        assert_eq!(headers[l2::POLY_API_KEY], Uuid::nil().to_string());
+        assert_eq!(headers[l2::KUEST_API_KEY], Uuid::nil().to_string());
         assert_eq!(
-            headers[l2::POLY_SIGNATURE],
+            headers[l2::KUEST_SIGNATURE],
             "eHaylCwqRSOa2LFD77Nt_SaTpbsxzN8eTEI3LryhEj4="
         );
-        assert_eq!(headers[l2::POLY_TIMESTAMP], "1");
+        assert_eq!(headers[l2::KUEST_TIMESTAMP], "1");
 
         Ok(())
     }
@@ -530,14 +530,14 @@ mod tests {
         let headers = builder.create_headers(&request, timestamp).await?;
 
         assert_eq!(
-            headers[builder::POLY_BUILDER_API_KEY],
+            headers[builder::KUEST_BUILDER_API_KEY],
             Uuid::nil().to_string()
         );
         assert_eq!(
-            headers[builder::POLY_BUILDER_PASSPHRASE],
+            headers[builder::KUEST_BUILDER_PASSPHRASE],
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         );
-        assert_eq!(headers[builder::POLY_BUILDER_TIMESTAMP], "1");
+        assert_eq!(headers[builder::KUEST_BUILDER_TIMESTAMP], "1");
 
         Ok(())
     }

@@ -5,17 +5,17 @@
 use std::str::FromStr as _;
 
 use futures::StreamExt as _;
-use polymarket_client_sdk::auth::Credentials;
-use polymarket_client_sdk::clob::ws::{Client, WsMessage};
-use polymarket_client_sdk::types::Address;
+use kuest_client_sdk::auth::Credentials;
+use kuest_client_sdk::clob::ws::{Client, WsMessage};
+use kuest_client_sdk::types::Address;
 use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let api_key = Uuid::parse_str(&std::env::var("POLYMARKET_API_KEY")?)?;
-    let api_secret = std::env::var("POLYMARKET_API_SECRET")?;
-    let api_passphrase = std::env::var("POLYMARKET_API_PASSPHRASE")?;
-    let address = Address::from_str(&std::env::var("POLYMARKET_ADDRESS")?)?;
+    let api_key = Uuid::parse_str(&std::env::var("KUEST_API_KEY")?)?;
+    let api_secret = std::env::var("KUEST_API_SECRET")?;
+    let api_passphrase = std::env::var("KUEST_API_PASSPHRASE")?;
+    let address = Address::from_str(&std::env::var("KUEST_ADDRESS")?)?;
 
     // Build credentials for the authenticated ws channel.
     let credentials = Credentials::new(api_key, api_secret, api_passphrase);

@@ -1,14 +1,14 @@
-//! Polymarket CLOB (Central Limit Order Book) API client and types.
+//! Kuest CLOB (Central Limit Order Book) API client and types.
 //!
 //! **Feature flag:** None (this is the core module, always available)
 //!
-//! This module provides the primary client for interacting with the Polymarket CLOB API,
+//! This module provides the primary client for interacting with the Kuest CLOB API,
 //! which handles all trading operations including order placement, cancellation, market
 //! data queries, and account management.
 //!
 //! # Overview
 //!
-//! The CLOB API is the main trading interface for Polymarket. It supports both
+//! The CLOB API is the main trading interface for Kuest. It supports both
 //! authenticated and unauthenticated operations:
 //!
 //! - **Unauthenticated**: Market data, pricing, orderbooks, health checks
@@ -70,12 +70,12 @@
 //! ## Unauthenticated Client
 //!
 //! ```rust,no_run
-//! use polymarket_client_sdk::clob::{Client, Config};
-//! use polymarket_client_sdk::clob::types::request::MidpointRequest;
+//! use kuest_client_sdk::clob::{Client, Config};
+//! use kuest_client_sdk::clob::types::request::MidpointRequest;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create an unauthenticated client
-//! let client = Client::new("https://clob.polymarket.com", Config::default())?;
+//! let client = Client::new("https://clob.kuest.com", Config::default())?;
 //!
 //! // Check API health
 //! let status = client.ok().await?;
@@ -98,17 +98,17 @@
 //!
 //! use alloy::signers::Signer;
 //! use alloy::signers::local::LocalSigner;
-//! use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
-//! use polymarket_client_sdk::clob::{Client, Config};
-//! use polymarket_client_sdk::clob::types::{Side, SignedOrder};
-//! use polymarket_client_sdk::types::{dec, Decimal};
+//! use kuest_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
+//! use kuest_client_sdk::clob::{Client, Config};
+//! use kuest_client_sdk::clob::types::{Side, SignedOrder};
+//! use kuest_client_sdk::types::{dec, Decimal};
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create signer from private key
 //! let private_key = std::env::var(PRIVATE_KEY_VAR)?;
 //! let signer = LocalSigner::from_str(&private_key)?.with_chain_id(Some(POLYGON));
 //!
-//! let client = Client::new("https://clob.polymarket.com", Config::default())?
+//! let client = Client::new("https://clob.kuest.com", Config::default())?
 //!     .authentication_builder(&signer)
 //!     .authenticate()
 //!     .await?;
@@ -138,7 +138,7 @@
 //!
 //! # API Base URL
 //!
-//! The default API endpoint is `https://clob.polymarket.com`.
+//! The default API endpoint is `https://clob.kuest.com`.
 
 pub mod client;
 pub mod order_builder;

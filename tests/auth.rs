@@ -7,14 +7,14 @@ use std::str::FromStr as _;
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
 use httpmock::MockServer;
-use polymarket_client_sdk::POLYGON;
-use polymarket_client_sdk::auth::{Credentials, ExposeSecret as _};
-use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::error::{Synchronization, Validation};
+use kuest_client_sdk::POLYGON;
+use kuest_client_sdk::auth::{Credentials, ExposeSecret as _};
+use kuest_client_sdk::clob::{Client, Config};
+use kuest_client_sdk::error::{Synchronization, Validation};
 use reqwest::StatusCode;
 use serde_json::json;
 
-use crate::common::{API_KEY, PASSPHRASE, POLY_ADDRESS, PRIVATE_KEY, SECRET, create_authenticated};
+use crate::common::{API_KEY, PASSPHRASE, KUEST_ADDRESS, PRIVATE_KEY, SECRET, create_authenticated};
 
 #[tokio::test]
 async fn authenticate_with_explicit_credentials_should_succeed() -> anyhow::Result<()> {
@@ -150,7 +150,7 @@ async fn create_api_key_should_succeed() -> anyhow::Result<()> {
     let mock = server.mock(|when, then| {
         when.method(httpmock::Method::POST)
             .path("/auth/api-key")
-            .header(POLY_ADDRESS, signer.address().to_string().to_lowercase());
+            .header(KUEST_ADDRESS, signer.address().to_string().to_lowercase());
         then.status(StatusCode::OK).json_body(json!({
             "apiKey": API_KEY.to_string(),
             "passphrase": PASSPHRASE,
@@ -175,7 +175,7 @@ async fn derive_api_key_should_succeed() -> anyhow::Result<()> {
     let mock = server.mock(|when, then| {
         when.method(httpmock::Method::GET)
             .path("/auth/derive-api-key")
-            .header(POLY_ADDRESS, signer.address().to_string().to_lowercase());
+            .header(KUEST_ADDRESS, signer.address().to_string().to_lowercase());
         then.status(StatusCode::OK).json_body(json!({
             "apiKey": API_KEY.to_string(),
             "passphrase": PASSPHRASE,
@@ -204,7 +204,7 @@ async fn create_or_derive_api_key_should_succeed() -> anyhow::Result<()> {
     let mock2 = server.mock(|when, then| {
         when.method(httpmock::Method::GET)
             .path("/auth/derive-api-key")
-            .header(POLY_ADDRESS, signer.address().to_string().to_lowercase());
+            .header(KUEST_ADDRESS, signer.address().to_string().to_lowercase());
         then.status(StatusCode::OK).json_body(json!({
             "apiKey": API_KEY.to_string(),
             "passphrase": PASSPHRASE,

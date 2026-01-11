@@ -1,13 +1,13 @@
-//! Client for the Polymarket Data API.
+//! Client for the Kuest Data API.
 //!
-//! This module provides an HTTP client for interacting with the Polymarket Data API,
+//! This module provides an HTTP client for interacting with the Kuest Data API,
 //! which offers endpoints for querying user positions, trades, activity, and market data.
 //!
 //! # Example
 //!
 //! ```no_run
-//! use polymarket_client_sdk::types::address;
-//! use polymarket_client_sdk::data::{Client, types::request::PositionsRequest};
+//! use kuest_client_sdk::types::address;
+//! use kuest_client_sdk::data::{Client, types::request::PositionsRequest};
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let client = Client::default();
@@ -43,19 +43,19 @@ use super::types::response::{
 };
 use crate::{Result, ToQueryParams as _};
 
-/// HTTP client for the Polymarket Data API.
+/// HTTP client for the Kuest Data API.
 ///
 /// Provides methods for querying user positions, trades, activity, market holders,
 /// open interest, volume data, and leaderboards.
 ///
 /// # API Base URL
 ///
-/// The default API endpoint is `https://data-api.polymarket.com`.
+/// The default API endpoint is `https://data-api.kuest.com`.
 ///
 /// # Example
 ///
 /// ```no_run
-/// use polymarket_client_sdk::data::Client;
+/// use kuest_client_sdk::data::Client;
 ///
 /// // Create client with default endpoint
 /// let client = Client::default();
@@ -71,7 +71,7 @@ pub struct Client {
 
 impl Default for Client {
     fn default() -> Self {
-        Client::new("https://data-api.polymarket.com")
+        Client::new("https://data-api.kuest.com")
             .expect("Client with default endpoint should succeed")
     }
 }
@@ -81,7 +81,7 @@ impl Client {
     ///
     /// # Arguments
     ///
-    /// * `host` - The base URL for the Data API (e.g., `https://data-api.polymarket.com`).
+    /// * `host` - The base URL for the Data API (e.g., `https://data-api.kuest.com`).
     ///
     /// # Errors
     ///
@@ -248,7 +248,7 @@ impl Client {
 
     /// Fetches aggregated builder leaderboard rankings.
     ///
-    /// Builders are third-party applications that integrate with Polymarket.
+    /// Builders are third-party applications that integrate with Kuest.
     /// Returns one entry per builder with aggregated totals for the specified time period.
     ///
     /// # Errors

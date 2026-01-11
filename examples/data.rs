@@ -17,14 +17,14 @@
 
 use std::fs::File;
 
-use polymarket_client_sdk::data::Client;
-use polymarket_client_sdk::data::types::request::{
+use kuest_client_sdk::data::Client;
+use kuest_client_sdk::data::types::request::{
     ActivityRequest, BuilderLeaderboardRequest, BuilderVolumeRequest, ClosedPositionsRequest,
     HoldersRequest, LiveVolumeRequest, OpenInterestRequest, PositionsRequest, TradedRequest,
     TraderLeaderboardRequest, TradesRequest, ValueRequest,
 };
-use polymarket_client_sdk::data::types::{LeaderboardCategory, TimePeriod};
-use polymarket_client_sdk::types::{Address, B256, address, b256};
+use kuest_client_sdk::data::types::{LeaderboardCategory, TimePeriod};
+use kuest_client_sdk::types::{Address, B256, address, b256};
 use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt as _;

@@ -91,7 +91,7 @@ pub struct FeeRateResponse {
     pub base_fee: u32,
 }
 
-/// Response from the Polymarket geoblock endpoint.
+/// Response from the Kuest geoblock endpoint.
 ///
 /// This indicates whether the requesting IP address is blocked from placing orders
 /// due to geographic restrictions.

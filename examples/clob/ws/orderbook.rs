@@ -3,7 +3,7 @@
 #![allow(clippy::print_stderr, reason = "Examples are okay to print to stderr")]
 
 use futures::StreamExt as _;
-use polymarket_client_sdk::clob::ws::Client;
+use kuest_client_sdk::clob::ws::Client;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

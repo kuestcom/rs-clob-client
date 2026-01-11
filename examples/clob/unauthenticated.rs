@@ -17,11 +17,11 @@
 use std::collections::HashMap;
 use std::fs::File;
 
-use polymarket_client_sdk::clob::types::Side;
-use polymarket_client_sdk::clob::types::request::{
+use kuest_client_sdk::clob::types::Side;
+use kuest_client_sdk::clob::types::request::{
     LastTradePriceRequest, MidpointRequest, OrderBookSummaryRequest, PriceRequest, SpreadRequest,
 };
-use polymarket_client_sdk::clob::{Client, Config};
+use kuest_client_sdk::clob::{Client, Config};
 use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt as _;
@@ -43,7 +43,7 @@ async fn main() -> anyhow::Result<()> {
         tracing_subscriber::fmt::init();
     }
 
-    let client = Client::new("https://clob.polymarket.com", Config::default())?;
+    let client = Client::new("https://clob.kuest.com", Config::default())?;
 
     // Health check endpoints
     match client.ok().await {

@@ -1,15 +1,14 @@
 [package]
-name = "polymarket-client-sdk"
-description = "Polymarket CLOB (Central Limit Order Book) API client SDK"
+name = "kuest-client-sdk"
+description = "Kuest CLOB (Central Limit Order Book) API client SDK"
 version = "0.3.3"
 authors = [
-    "Polymarket Engineering <engineering@polymarket.com>",
-    "Chaz Byrnes <chaz@polymarket.com>",
+    "Kuest Engineering <engineering@kuest.com>",
 ]
 readme = "README.md"
-repository = "https://github.com/polymarket/rs-clob-client"
+repository = "https://github.com/kuestcom/rs-clob-client"
 license = "MIT"
-keywords = ["polymarket", "clob", "orderbook", "trading", "prediction-market"]
+keywords = ["kuest", "clob", "orderbook", "trading", "prediction-market"]
 categories = [
     "api-bindings",
     "cryptography::cryptocurrencies",

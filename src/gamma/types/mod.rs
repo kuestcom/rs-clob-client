@@ -1,4 +1,4 @@
-//! Types for the Polymarket Gamma API.
+//! Types for the Kuest Gamma API.
 //!
 //! This module contains all types used by the Gamma API client, organized into:
 //!
@@ -16,7 +16,7 @@
 //! All request types use the builder pattern via the [`bon`](https://docs.rs/bon) crate:
 //!
 //! ```
-//! use polymarket_client_sdk::gamma::types::request::{EventsRequest, MarketsRequest};
+//! use kuest_client_sdk::gamma::types::request::{EventsRequest, MarketsRequest};
 //!
 //! // Simple request with defaults
 //! let events = EventsRequest::builder().build();

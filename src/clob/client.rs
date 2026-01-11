@@ -60,7 +60,7 @@ use crate::{
     derive_proxy_wallet, derive_safe_wallet,
 };
 
-const ORDER_NAME: Option<Cow<'static, str>> = Some(Cow::Borrowed("Polymarket CTF Exchange"));
+const ORDER_NAME: Option<Cow<'static, str>> = Some(Cow::Borrowed("Kuest CTF Exchange"));
 const VERSION: Option<Cow<'static, str>> = Some(Cow::Borrowed("1"));
 
 const TERMINAL_CURSOR: &str = "LTE="; // base64("-1")
@@ -149,7 +149,7 @@ impl<S: Signer, K: Kind> AuthenticationBuilder<'_, S, K> {
 
         // Auto-derive funder from signer using CREATE2 when using proxy signature types
         // without explicit funder. This computes the deterministic wallet address that
-        // Polymarket deploys for the user.
+        // Kuest deploys for the user.
         let funder = match (self.funder, self.signature_type) {
             (None, Some(SignatureType::Proxy)) => {
                 let derived =
@@ -244,7 +244,7 @@ impl<S: Signer, K: Kind> AuthenticationBuilder<'_, S, K> {
     }
 }
 
-/// The main way for API users to interact with the Polymarket CLOB.
+/// The main way for API users to interact with the Kuest CLOB.
 ///
 /// A [`Client`] can either be [`Unauthenticated`] or [`Authenticated`], that is, authenticated
 /// with a particular [`Signer`], `S`, and a particular [`Kind`], `K`. That [`Kind`] lets
@@ -258,12 +258,12 @@ impl<S: Signer, K: Kind> AuthenticationBuilder<'_, S, K> {
 ///
 /// Create an unauthenticated client:
 /// ```rust,no_run
-/// use polymarket_client_sdk::Result;
-/// use polymarket_client_sdk::clob::{Client, Config};
+/// use kuest_client_sdk::Result;
+/// use kuest_client_sdk::clob::{Client, Config};
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<()> {
-///     let client = Client::new("https://clob.polymarket.com", Config::default())?;
+///     let client = Client::new("https://clob.kuest.com", Config::default())?;
 ///
 ///     let ok = client.ok().await?;
 ///     println!("Ok: {ok}");
@@ -278,14 +278,14 @@ impl<S: Signer, K: Kind> AuthenticationBuilder<'_, S, K> {
 ///
 /// use alloy::signers::Signer as _;
 /// use alloy::signers::local::LocalSigner;
-/// use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
-/// use polymarket_client_sdk::clob::{Client, Config};
+/// use kuest_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
+/// use kuest_client_sdk::clob::{Client, Config};
 ///
 /// #[tokio::main]
 /// async fn main() -> anyhow::Result<()> {
 ///     let private_key = std::env::var(PRIVATE_KEY_VAR).expect("Need a private key");
 ///     let signer = LocalSigner::from_str(&private_key)?.with_chain_id(Some(POLYGON));
-///     let client = Client::new("https://clob.polymarket.com", Config::default())?
+///     let client = Client::new("https://clob.kuest.com", Config::default())?
 ///         .authentication_builder(&signer)
 ///         .authenticate()
 ///         .await?;
@@ -359,7 +359,7 @@ impl Drop for DroppingCancellationToken {
 
 impl Default for Client<Unauthenticated> {
     fn default() -> Self {
-        Client::new("https://clob.polymarket.com", Config::default())
+        Client::new("https://clob.kuest.com", Config::default())
             .expect("Client with default endpoint should succeed")
     }
 }
@@ -367,11 +367,11 @@ impl Default for Client<Unauthenticated> {
 /// Configuration for [`Client`]
 #[derive(Clone, Debug, Default, Builder)]
 pub struct Config {
-    /// Whether the [`Client`] will use the server time provided by Polymarket when creating auth
+    /// Whether the [`Client`] will use the server time provided by Kuest when creating auth
     /// headers. This adds another round trip to the requests.
     #[builder(default)]
     use_server_time: bool,
-    /// Override for the geoblock API host. Defaults to `https://polymarket.com`.
+    /// Override for the geoblock API host. Defaults to `https://api.kuest.com`.
     /// This is primarily useful for testing.
     #[builder(into)]
     geoblock_host: Option<String>,
@@ -382,7 +382,7 @@ pub struct Config {
 }
 
 /// The default geoblock API host (separate from CLOB host)
-const DEFAULT_GEOBLOCK_HOST: &str = "https://polymarket.com";
+const DEFAULT_GEOBLOCK_HOST: &str = "https://api.kuest.com";
 
 #[derive(Debug)]
 struct ClientInner<S: State> {
@@ -483,9 +483,9 @@ impl<S: State> Client<S> {
     /// # Example
     ///
     /// ```no_run
-    /// # use polymarket_client_sdk::clob::{Client, Config};
+    /// # use kuest_client_sdk::clob::{Client, Config};
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::new("https://clob.polymarket.com", Config::default())?;
+    /// let client = Client::new("https://clob.kuest.com", Config::default())?;
     /// println!("Host: {}", client.host());
     /// # Ok(())
     /// # }
@@ -814,9 +814,9 @@ impl<S: State> Client<S> {
         Ok(response)
     }
 
-    /// Checks if the current IP address is geoblocked from accessing Polymarket.
+    /// Checks if the current IP address is geoblocked from accessing Kuest.
     ///
-    /// This method queries the Polymarket geoblock endpoint to determine if access
+    /// This method queries the Kuest geoblock endpoint to determine if access
     /// is restricted based on the caller's IP address and geographic location.
     ///
     /// # Returns
@@ -831,12 +831,12 @@ impl<S: State> Client<S> {
     /// # Example
     ///
     /// ```rust,no_run
-    /// use polymarket_client_sdk::clob::{Client, Config};
-    /// use polymarket_client_sdk::error::{Kind, Geoblock};
+    /// use kuest_client_sdk::clob::{Client, Config};
+    /// use kuest_client_sdk::error::{Kind, Geoblock};
     ///
     /// #[tokio::main]
     /// async fn main() -> anyhow::Result<()> {
-    ///     let client = Client::new("https://clob.polymarket.com", Config::default())?;
+    ///     let client = Client::new("https://clob.kuest.com", Config::default())?;
     ///
     ///     let geoblock = client.check_geoblock().await?;
     ///
@@ -863,7 +863,7 @@ impl<S: State> Client<S> {
             .client()
             .request(
                 Method::GET,
-                format!("{}api/geoblock", self.inner.geoblock_host),
+                format!("{}geoblock", self.inner.geoblock_host),
             )
             .build()?;
 
@@ -1114,7 +1114,7 @@ impl Client<Unauthenticated> {
     ///
     /// # Arguments
     ///
-    /// * `host` - The CLOB API URL (e.g., <https://clob.polymarket.com>)
+    /// * `host` - The CLOB API URL (e.g., <https://clob.kuest.com>)
     /// * `config` - Client configuration options
     ///
     /// # Errors
@@ -1124,10 +1124,10 @@ impl Client<Unauthenticated> {
     /// # Example
     ///
     /// ```no_run
-    /// use polymarket_client_sdk::clob::{Client, Config};
+    /// use kuest_client_sdk::clob::{Client, Config};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::new("https://clob.polymarket.com", Config::default())?;
+    /// let client = Client::new("https://clob.kuest.com", Config::default())?;
     /// # Ok(())
     /// # }
     /// ```
@@ -1180,12 +1180,12 @@ impl Client<Unauthenticated> {
     /// # Example
     ///
     /// ```no_run
-    /// use polymarket_client_sdk::clob::{Client, Config};
+    /// use kuest_client_sdk::clob::{Client, Config};
     /// use alloy::signers::local::LocalSigner;
     /// use std::str::FromStr;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::new("https://clob.polymarket.com", Config::default())?;
+    /// let client = Client::new("https://clob.kuest.com", Config::default())?;
     /// let signer = LocalSigner::from_str("0x...")?;
     ///
     /// let authenticated_client = client

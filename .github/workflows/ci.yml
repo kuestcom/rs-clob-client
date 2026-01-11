@@ -87,7 +87,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
-        if: ${{ github.repository_owner == 'Polymarket' }}
+        if: ${{ github.repository_owner == 'kuestcom' }}
         with:
           files: lcov.info
           flags: rust

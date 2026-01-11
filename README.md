@@ -1,12 +1,12 @@
-![Polymarket](assets/logo.png)
+![Kuest](assets/logo.png)
 
-# Polymarket Rust Client
+# Kuest Rust Client
 
-[![Crates.io](https://img.shields.io/crates/v/polymarket-client-sdk.svg)](https://crates.io/crates/polymarket-client-sdk)
-[![CI](https://github.com/Polymarket/rs-clob-client/actions/workflows/ci.yml/badge.svg)](https://github.com/Polymarket/rs-clob-client/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/Polymarket/rs-clob-client/graph/badge.svg?token=FW1BYWWFJ2)](https://codecov.io/gh/Polymarket/rs-clob-client)
+[![Crates.io](https://img.shields.io/crates/v/kuest-client-sdk.svg)](https://crates.io/crates/kuest-client-sdk)
+[![CI](https://github.com/kuestcom/rs-clob-client/actions/workflows/ci.yml/badge.svg)](https://github.com/kuestcom/rs-clob-client/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/kuestcom/rs-clob-client/graph/badge.svg?token=FW1BYWWFJ2)](https://codecov.io/gh/kuestcom/rs-clob-client)
 
-An ergonomic Rust client for interacting with Polymarket services, primarily the Central Limit Order Book (CLOB).
+An ergonomic Rust client for interacting with Kuest services, primarily the Central Limit Order Book (CLOB).
 This crate provides strongly typed request builders, authenticated endpoints, `alloy` support and more.
 
 ## Table of Contents
@@ -23,14 +23,14 @@ This crate provides strongly typed request builders, authenticated endpoints, `a
 - [Setting Token Allowances](#token-allowances)
 - [Minimum Supported Rust Version (MSRV)](#minimum-supported-rust-version-msrv)
 - [Contributing](#contributing)
-- [About Polymarket](#about-polymarket)
+- [About Kuest](#about-kuest)
 
 ## Overview
 
 - **Typed CLOB requests** (orders, trades, markets, balances, and more)
 - **Dual authentication flows**
     - Normal authenticated flow
-    - [Builder](https://docs.polymarket.com/developers/builders/builder-intro) authentication flow
+    - [Builder](https://docs.kuest.com/developers/builders/builder-intro) authentication flow
 - **Type-level state machine**
     - Prevents using authenticated endpoints before authenticating
     - Compile-time enforcement of correct transitions
@@ -48,13 +48,13 @@ Add the crate to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-polymarket-client-sdk = "0.3"
+kuest-client-sdk = "0.3"
 ```
 
 or
 
 ```bash
-cargo add polymarket-client-sdk
+cargo add kuest-client-sdk
 ```
 
 Then run any of the examples
@@ -64,7 +64,7 @@ cargo run --example unauthenticated
 
 ## Feature Flags
 
-The crate is modular with optional features for different Polymarket APIs:
+The crate is modular with optional features for different Kuest APIs:
 
 | Feature      | Description                                                                                                                                    |
 |--------------|------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -76,14 +76,14 @@ The crate is modular with optional features for different Polymarket APIs:
 | `gamma`      | Gamma API client for market/event discovery, search, and metadata                                                                              |
 | `bridge`     | Bridge API client for cross-chain deposits (EVM, Solana, Bitcoin)                                                                              |
 | `rfq`        | RFQ API (within CLOB) for submitting and querying quotes                                                                                       |
-| `heartbeats` | Clob feature that automatically sends heartbeat messages to the Polymarket server, if the client disconnects all open orders will be cancelled |
-| `ctf`        | CTF API client to perform split/merge/redeem on binary and neg risk markets
+| `heartbeats` | Clob feature that automatically sends heartbeat messages to the Kuest server; if the client disconnects all open orders will be cancelled |
+| `ctf`        | CTF API client to perform split/merge/redeem on binary and neg risk markets                                              |
 
 Enable features in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-polymarket-client-sdk = { version = "0.3", features = ["ws", "data"] }
+kuest-client-sdk = { version = "0.3", features = ["ws", "data"] }
 ```
 
 ## Re-exported Types
@@ -93,7 +93,7 @@ This SDK re-exports commonly used types from external crates so you don't need t
 ### From `types` module
 
 ```rust
-use polymarket_client_sdk::types::{
+use kuest_client_sdk::types::{
     Address, ChainId, Signature, address,  // from alloy::primitives
     DateTime, NaiveDate, Utc,              // from chrono
     Decimal, dec,                          // from rust_decimal + rust_decimal_macros
@@ -103,7 +103,7 @@ use polymarket_client_sdk::types::{
 ### From `auth` module
 
 ```rust
-use polymarket_client_sdk::auth::{
+use kuest_client_sdk::auth::{
     LocalSigner, Signer,          // from alloy::signers (LocalSigner + trait)
     Uuid, ApiKey,                 // from uuid (ApiKey = Uuid)
     SecretString, ExposeSecret,   // from secrecy
@@ -114,7 +114,7 @@ use polymarket_client_sdk::auth::{
 ### From `error` module
 
 ```rust
-use polymarket_client_sdk::error::{
+use kuest_client_sdk::error::{
     StatusCode, Method,           // from reqwest (for error inspection)
 };
 ```
@@ -129,7 +129,7 @@ See `examples/` for the complete set. Below are hand-picked examples for common 
 
 #### Unauthenticated client (read-only)
 ```rust,ignore
-use polymarket_client_sdk::clob::Client;
+use kuest_client_sdk::clob::Client;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -144,7 +144,7 @@ async fn main() -> anyhow::Result<()> {
 
 #### Authenticated client
 
-Set `POLYMARKET_PRIVATE_KEY` as an environment variable with your private key.
+Set `KUEST_PRIVATE_KEY` as an environment variable with your private key.
 
 ##### [EOA](https://www.binance.com/en/academy/glossary/externally-owned-account-eoa) wallets
 If using MetaMask or hardware wallet, you must first set token allowances. See [Token Allowances](#token-allowances) section below.
@@ -154,14 +154,14 @@ use std::str::FromStr as _;
 
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
-use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
-use polymarket_client_sdk::clob::{Client, Config};
+use kuest_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
+use kuest_client_sdk::clob::{Client, Config};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let private_key = std::env::var(PRIVATE_KEY_VAR).expect("Need a private key");
     let signer = LocalSigner::from_str(&private_key)?.with_chain_id(Some(POLYGON));
-    let client = Client::new("https://clob.polymarket.com", Config::default())?
+    let client = Client::new("https://clob.kuest.com", Config::default())?
         .authentication_builder(&signer)
         .authenticate()
         .await?;
@@ -180,22 +180,22 @@ async fn main() -> anyhow::Result<()> {
 For proxy/Safe wallets, the funder address is **automatically derived** using CREATE2 from your signer's EOA address:
 
 ```rust,ignore
-let client = Client::new("https://clob.polymarket.com", Config::default())?
+let client = Client::new("https://clob.kuest.com", Config::default())?
     .authentication_builder(&signer)
     .signature_type(SignatureType::GnosisSafe)  // Funder auto-derived via CREATE2
     .authenticate()
     .await?;
 ```
 
-The SDK computes the deterministic wallet address that Polymarket deploys for your EOA. This is the same address
-shown on polymarket.com when you log in with a browser wallet.
+The SDK computes the deterministic wallet address that Kuest deploys for your EOA. This is the same address
+shown on kuest.com when you log in with a browser wallet.
 
 If you need to override the derived address (e.g., for advanced use cases), you can explicitly provide it:
 
 ```rust,ignore
-let client = Client::new("https://clob.polymarket.com", Config::default())?
+let client = Client::new("https://clob.kuest.com", Config::default())?
     .authentication_builder(&signer)
-    .funder(address!("<your-polymarket-wallet-address>"))
+    .funder(address!("<your-kuest-wallet-address>"))
     .signature_type(SignatureType::GnosisSafe)
     .authenticate()
     .await?;
@@ -204,7 +204,7 @@ let client = Client::new("https://clob.polymarket.com", Config::default())?
 You can also derive these addresses manually:
 
 ```rust,ignore
-use polymarket_client_sdk::{derive_safe_wallet, derive_proxy_wallet, POLYGON};
+use kuest_client_sdk::{derive_safe_wallet, derive_proxy_wallet, POLYGON};
 
 // For browser wallet users (GnosisSafe)
 let safe_address = derive_safe_wallet(signer.address(), POLYGON);
@@ -214,7 +214,7 @@ let proxy_address = derive_proxy_wallet(signer.address(), POLYGON);
 ```
 
 ##### Funder Address
-The **funder address** is the actual address that holds your funds on Polymarket. When using proxy wallets (email wallets
+The **funder address** is the actual address that holds your funds on Kuest. When using proxy wallets (email wallets
 like Magic or browser extension wallets), the signing key differs from the address holding the funds. The SDK automatically
 derives the correct funder address using CREATE2 when you specify `SignatureType::Proxy` or `SignatureType::GnosisSafe`.
 You can override this with `.funder(address)` if needed.
@@ -235,16 +235,16 @@ use std::str::FromStr as _;
 
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
-use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
-use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::clob::types::{Amount, OrderType, Side};
-use polymarket_client_sdk::types::Decimal;
+use kuest_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
+use kuest_client_sdk::clob::{Client, Config};
+use kuest_client_sdk::clob::types::{Amount, OrderType, Side};
+use kuest_client_sdk::types::Decimal;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let private_key = std::env::var(PRIVATE_KEY_VAR).expect("Need a private key");
     let signer = LocalSigner::from_str(&private_key)?.with_chain_id(Some(POLYGON));
-    let client = Client::new("https://clob.polymarket.com", Config::default())?
+    let client = Client::new("https://clob.kuest.com", Config::default())?
         .authentication_builder(&signer)
         .authenticate()
         .await?;
@@ -272,17 +272,17 @@ use std::str::FromStr as _;
 
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
-use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
-use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::clob::types::Side;
-use polymarket_client_sdk::types::Decimal;
+use kuest_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
+use kuest_client_sdk::clob::{Client, Config};
+use kuest_client_sdk::clob::types::Side;
+use kuest_client_sdk::types::Decimal;
 use rust_decimal_macros::dec;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let private_key = std::env::var(PRIVATE_KEY_VAR).expect("Need a private key");
     let signer = LocalSigner::from_str(&private_key)?.with_chain_id(Some(POLYGON));
-    let client = Client::new("https://clob.polymarket.com", Config::default())?
+    let client = Client::new("https://clob.kuest.com", Config::default())?
         .authentication_builder(&signer)
         .authenticate()
         .await?;
@@ -311,11 +311,11 @@ use std::str::FromStr as _;
 
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
-use polymarket_client_sdk::auth::builder::Config as BuilderConfig;
-use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
-use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::clob::types::SignatureType;
-use polymarket_client_sdk::clob::types::request::TradesRequest;
+use kuest_client_sdk::auth::builder::Config as BuilderConfig;
+use kuest_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
+use kuest_client_sdk::clob::{Client, Config};
+use kuest_client_sdk::clob::types::SignatureType;
+use kuest_client_sdk::clob::types::request::TradesRequest;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -323,7 +323,7 @@ async fn main() -> anyhow::Result<()> {
     let signer = LocalSigner::from_str(&private_key)?.with_chain_id(Some(POLYGON));
     let builder_config = BuilderConfig::remote("http://localhost:3000/sign", None)?; // Or your signing server
 
-    let client = Client::new("https://clob.polymarket.com", Config::default())?
+    let client = Client::new("https://clob.kuest.com", Config::default())?
         .authentication_builder(&signer)
         .signature_type(SignatureType::Proxy)  // Funder auto-derived via CREATE2
         .authenticate()
@@ -349,12 +349,12 @@ async fn main() -> anyhow::Result<()> {
 Real-time orderbook and user event streaming. Requires the `ws` feature.
 
 ```toml
-polymarket-client-sdk = { version = "0.3", features = ["ws"] }
+kuest-client-sdk = { version = "0.3", features = ["ws"] }
 ```
 
 ```rust,ignore
 use futures::StreamExt as _;
-use polymarket_client_sdk::clob::ws::Client;
+use kuest_client_sdk::clob::ws::Client;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -389,9 +389,9 @@ See [`examples/clob/ws/`](examples/clob/ws/) for more WebSocket examples includi
 Trading analytics, positions, and leaderboards. Requires the `data` feature.
 
 ```rust,ignore
-use polymarket_client_sdk::data::Client;
-use polymarket_client_sdk::data::types::request::PositionsRequest;
-use polymarket_client_sdk::types::address;
+use kuest_client_sdk::data::Client;
+use kuest_client_sdk::data::types::request::PositionsRequest;
+use kuest_client_sdk::types::address;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -411,8 +411,8 @@ See [`examples/data.rs`](examples/data.rs) for trades, leaderboards, activity, a
 Market and event discovery. Requires the `gamma` feature.
 
 ```rust,ignore
-use polymarket_client_sdk::gamma::Client;
-use polymarket_client_sdk::gamma::types::request::{EventsRequest, SearchRequest};
+use kuest_client_sdk::gamma::Client;
+use kuest_client_sdk::gamma::types::request::{EventsRequest, SearchRequest};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -437,9 +437,9 @@ See [`examples/gamma.rs`](examples/gamma.rs) for tags, series, comments, and spo
 Cross-chain deposits from EVM chains, Solana, and Bitcoin. Requires the `bridge` feature.
 
 ```rust,ignore
-use polymarket_client_sdk::bridge::Client;
-use polymarket_client_sdk::bridge::types::DepositRequest;
-use polymarket_client_sdk::types::address;
+use kuest_client_sdk::bridge::Client;
+use kuest_client_sdk::bridge::types::DepositRequest;
+use kuest_client_sdk::types::address;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -481,7 +481,7 @@ MetaMask and EOA users must set token allowances.
 If you are using a proxy or [Safe](https://help.safe.global/en/articles/40869-what-is-safe)-type wallet, then you do not.
 
 ### What are allowances?
-Think of allowances as permissions. Before Polymarket can move your funds to execute trades, you need to give the
+Think of allowances as permissions. Before Kuest can move your funds to execute trades, you need to give the
 exchange contracts permission to access your USDC and conditional tokens.
 
 ### Quick Setup
@@ -515,8 +515,8 @@ We encourage contributions from the community. Check out our [contributing guide
 instructions on how to contribute to this SDK.
 
 
-## About Polymarket
-[Polymarket](https://docs.polymarket.com/polymarket-learn/get-started/what-is-polymarket) is the world’s largest prediction market, allowing you to stay informed and profit from your knowledge by
+## About Kuest
+[Kuest](https://docs.kuest.com/kuest-learn/get-started/what-is-kuest) is the world’s largest prediction market, allowing you to stay informed and profit from your knowledge by
 betting on future events across various topics.
 Studies show prediction markets are often more accurate than pundits because they combine news, polls, and expert
 opinions into a single value that represents the market’s view of an event’s odds. Our markets reflect accurate, unbiased,

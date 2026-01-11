@@ -16,7 +16,7 @@ use reqwest::header;
 pub enum Kind {
     /// Error related to non-successful HTTP call
     Status,
-    /// Error related to invalid state within polymarket-client-sdk
+    /// Error related to invalid state within kuest-client-sdk
     Validation,
     /// Error related to synchronization of authenticated clients logging in and out
     Synchronization,
@@ -181,7 +181,7 @@ impl From<MissingContractConfig> for Error {
     }
 }
 
-/// Error indicating that the user is blocked from accessing Polymarket due to geographic
+/// Error indicating that the user is blocked from accessing Kuest due to geographic
 /// restrictions.
 ///
 /// This error contains information about the user's detected location.

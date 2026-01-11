@@ -12,7 +12,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use polymarket_client_sdk::ctf::Client;
+//! use kuest_client_sdk::ctf::Client;
 //! use alloy::providers::ProviderBuilder;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -49,7 +49,7 @@ use crate::{Result, contract_config};
 // This interface is based on the Gnosis CTF contract.
 //
 // Source: https://github.com/gnosis/conditional-tokens-contracts
-// Documentation: https://docs.polymarket.com/developers/CTF/overview
+// Documentation: https://docs.kuest.com/developers/CTF/overview
 //
 // Key functions implemented:
 // - getConditionId, getCollectionId, getPositionId: Pure/view functions for ID calculations

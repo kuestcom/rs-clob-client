@@ -3,8 +3,8 @@
 use alloy::signers::Signer as _;
 use alloy::signers::aws::AwsSigner;
 use aws_config::BehaviorVersion;
-use polymarket_client_sdk::POLYGON;
-use polymarket_client_sdk::clob::{Client, Config};
+use kuest_client_sdk::POLYGON;
+use kuest_client_sdk::clob::{Client, Config};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
         .await?
         .with_chain_id(Some(POLYGON));
 
-    let client = Client::new("https://clob.polymarket.com", Config::default())?
+    let client = Client::new("https://clob.kuest.com", Config::default())?
         .authentication_builder(&alloy_signer)
         .authenticate()
         .await?;

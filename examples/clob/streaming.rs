@@ -14,9 +14,9 @@
 //! LOG_FILE=streaming.log RUST_LOG=info,hyper_util=off,hyper=off,reqwest=off,h2=off,rustls=off cargo run --example streaming --features tracing
 //! ```
 //!
-//! For authenticated streaming, set the `POLY_PRIVATE_KEY` environment variable:
+//! For authenticated streaming, set the `KUEST_PRIVATE_KEY` environment variable:
 //! ```sh
-//! POLY_PRIVATE_KEY=0x... RUST_LOG=info cargo run --example streaming --features tracing
+//! KUEST_PRIVATE_KEY=0x... RUST_LOG=info cargo run --example streaming --features tracing
 //! ```
 
 use std::fs::File;
@@ -25,9 +25,9 @@ use std::str::FromStr as _;
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
 use futures::{StreamExt as _, future};
-use polymarket_client_sdk::clob::types::request::TradesRequest;
-use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
+use kuest_client_sdk::clob::types::request::TradesRequest;
+use kuest_client_sdk::clob::{Client, Config};
+use kuest_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
 use tokio::join;
 use tracing::{debug, info, warn};
 use tracing_subscriber::EnvFilter;
@@ -56,7 +56,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn unauthenticated() -> anyhow::Result<()> {
-    let client = Client::new("https://clob.polymarket.com", Config::default())?;
+    let client = Client::new("https://clob.kuest.com", Config::default())?;
 
     info!(
         stream = "sampling_markets",
@@ -114,7 +114,7 @@ async fn authenticated() -> anyhow::Result<()> {
 
     let signer = LocalSigner::from_str(&private_key)?.with_chain_id(Some(POLYGON));
 
-    let client = Client::new("https://clob.polymarket.com", Config::default())?
+    let client = Client::new("https://clob.kuest.com", Config::default())?
         .authentication_builder(&signer)
         .authenticate()
         .await?;

@@ -30,7 +30,7 @@
 
 mod sports {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::gamma::{Client, types::request::TeamsRequest};
+    use kuest_client_sdk::gamma::{Client, types::request::TeamsRequest};
     use reqwest::StatusCode;
     use serde_json::json;
 
@@ -135,7 +135,7 @@ mod sports {
 
 mod tags {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::gamma::{
+    use kuest_client_sdk::gamma::{
         Client,
         types::request::{
             RelatedTagsByIdRequest, RelatedTagsBySlugRequest, TagByIdRequest, TagBySlugRequest,
@@ -356,7 +356,7 @@ mod tags {
 
 mod events {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::gamma::{
+    use kuest_client_sdk::gamma::{
         Client,
         types::request::{EventByIdRequest, EventBySlugRequest, EventsRequest},
     };
@@ -444,7 +444,7 @@ mod events {
 
 mod markets {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::gamma::{
+    use kuest_client_sdk::gamma::{
         Client,
         types::request::{MarketByIdRequest, MarketBySlugRequest, MarketsRequest},
     };
@@ -606,7 +606,7 @@ mod markets {
 
 mod search {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::gamma::{Client, types::request::SearchRequest};
+    use kuest_client_sdk::gamma::{Client, types::request::SearchRequest};
     use reqwest::StatusCode;
     use serde_json::json;
 
@@ -644,7 +644,7 @@ mod search {
 
 mod health {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::gamma::Client;
+    use kuest_client_sdk::gamma::Client;
     use reqwest::StatusCode;
 
     #[tokio::test]
@@ -668,7 +668,7 @@ mod health {
 
 mod series {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::gamma::{
+    use kuest_client_sdk::gamma::{
         Client,
         types::request::{SeriesByIdRequest, SeriesListRequest},
     };
@@ -735,12 +735,12 @@ mod series {
 
 mod comments {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::gamma::types::ParentEntityType;
-    use polymarket_client_sdk::gamma::{
+    use kuest_client_sdk::gamma::types::ParentEntityType;
+    use kuest_client_sdk::gamma::{
         Client,
         types::request::{CommentsByIdRequest, CommentsByUserAddressRequest, CommentsRequest},
     };
-    use polymarket_client_sdk::types::address;
+    use kuest_client_sdk::types::address;
     use reqwest::StatusCode;
     use serde_json::json;
 
@@ -871,8 +871,8 @@ mod comments {
 
 mod profiles {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::gamma::{Client, types::request::PublicProfileRequest};
-    use polymarket_client_sdk::types::address;
+    use kuest_client_sdk::gamma::{Client, types::request::PublicProfileRequest};
+    use kuest_client_sdk::types::address;
     use reqwest::StatusCode;
     use serde_json::json;
 
@@ -888,7 +888,7 @@ mod profiles {
                 .query_param("address", "0x56687bf447db6ffa42ffe2204a05edaa20f55839");
             then.status(StatusCode::OK).json_body(json!({
                 "proxyWallet": "0x56687bf447db6ffa42ffe2204a05edaa20f55839",
-                "name": "Polymarket Trader",
+                "name": "Kuest Trader",
                 "pseudonym": "PolyTrader",
                 "bio": "Trading prediction markets",
                 "displayUsernamePublic": true,
@@ -901,7 +901,7 @@ mod profiles {
             .build();
         let response = client.public_profile(&request).await?;
 
-        assert_eq!(response.name, Some("Polymarket Trader".to_owned()));
+        assert_eq!(response.name, Some("Kuest Trader".to_owned()));
         assert_eq!(response.pseudonym, Some("PolyTrader".to_owned()));
         assert_eq!(response.verified_badge, Some(false));
         mock.assert();
@@ -912,7 +912,7 @@ mod profiles {
 
 mod event_tags {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::gamma::{Client, types::request::EventTagsRequest};
+    use kuest_client_sdk::gamma::{Client, types::request::EventTagsRequest};
     use reqwest::StatusCode;
     use serde_json::json;
 
@@ -953,7 +953,7 @@ mod event_tags {
 
 mod market_tags {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::gamma::{Client, types::request::MarketTagsRequest};
+    use kuest_client_sdk::gamma::{Client, types::request::MarketTagsRequest};
     use reqwest::StatusCode;
     use serde_json::json;
 
@@ -991,16 +991,16 @@ mod market_tags {
 
 mod query_string {
     use chrono::{TimeZone as _, Utc};
-    use polymarket_client_sdk::ToQueryParams as _;
-    use polymarket_client_sdk::gamma::types::request::{
+    use kuest_client_sdk::ToQueryParams as _;
+    use kuest_client_sdk::gamma::types::request::{
         CommentsByIdRequest, CommentsByUserAddressRequest, CommentsRequest, EventByIdRequest,
         EventBySlugRequest, EventTagsRequest, EventsRequest, MarketByIdRequest,
         MarketBySlugRequest, MarketTagsRequest, MarketsRequest, PublicProfileRequest,
         RelatedTagsByIdRequest, RelatedTagsBySlugRequest, SearchRequest, SeriesByIdRequest,
         SeriesListRequest, TagByIdRequest, TagBySlugRequest, TagsRequest, TeamsRequest,
     };
-    use polymarket_client_sdk::gamma::types::{ParentEntityType, RelatedTagsStatus};
-    use polymarket_client_sdk::types::{address, b256};
+    use kuest_client_sdk::gamma::types::{ParentEntityType, RelatedTagsStatus};
+    use kuest_client_sdk::types::{address, b256};
     use rust_decimal_macros::dec;
 
     #[test]

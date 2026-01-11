@@ -8,9 +8,9 @@
 use std::str::FromStr as _;
 use std::time::Duration;
 
-use polymarket_client_sdk::auth::{LocalSigner, Signer as _};
-use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
+use kuest_client_sdk::auth::{LocalSigner, Signer as _};
+use kuest_client_sdk::clob::{Client, Config};
+use kuest_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -23,7 +23,7 @@ async fn main() -> anyhow::Result<()> {
         .use_server_time(true)
         .heartbeat_interval(Duration::from_secs(1))
         .build();
-    let client = Client::new("https://clob.polymarket.com", config)?
+    let client = Client::new("https://clob.kuest.com", config)?
         .authentication_builder(&signer)
         .authenticate()
         .await?;

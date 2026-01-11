@@ -1,12 +1,12 @@
-//! Client for the Polymarket Gamma API.
+//! Client for the Kuest Gamma API.
 //!
-//! This module provides an HTTP client for interacting with the Polymarket Gamma API,
+//! This module provides an HTTP client for interacting with the Kuest Gamma API,
 //! which offers endpoints for querying events, markets, tags, series, comments, and more.
 //!
 //! # Example
 //!
 //! ```no_run
-//! use polymarket_client_sdk::gamma::{Client, types::request::EventsRequest};
+//! use kuest_client_sdk::gamma::{Client, types::request::EventsRequest};
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let client = Client::default();
@@ -47,19 +47,19 @@ use super::types::response::{
 use crate::error::Error;
 use crate::{Result, ToQueryParams as _};
 
-/// HTTP client for the Polymarket Gamma API.
+/// HTTP client for the Kuest Gamma API.
 ///
 /// Provides methods for querying events, markets, tags, series, comments,
 /// profiles, and search functionality.
 ///
 /// # API Base URL
 ///
-/// The default API endpoint is `https://gamma-api.polymarket.com`.
+/// The default API endpoint is `https://gamma-api.kuest.com/#disabled`.
 ///
 /// # Example
 ///
 /// ```no_run
-/// use polymarket_client_sdk::gamma::Client;
+/// use kuest_client_sdk::gamma::Client;
 ///
 /// // Create client with default endpoint
 /// let client = Client::default();
@@ -71,11 +71,19 @@ use crate::{Result, ToQueryParams as _};
 pub struct Client {
     host: Url,
     client: ReqwestClient,
+    disabled: bool,
+}
+
+const DEFAULT_HOST: &str = "https://gamma-api.kuest.com/#disabled";
+const DISABLED_HOST: &str = "gamma-api.kuest.com";
+
+fn is_disabled_host(host: &Url) -> bool {
+    host.fragment().is_some() || host.host_str() == Some(DISABLED_HOST)
 }
 
 impl Default for Client {
     fn default() -> Self {
-        Client::new("https://gamma-api.polymarket.com")
+        Client::new(DEFAULT_HOST)
             .expect("Client with default endpoint should succeed")
     }
 }
@@ -98,10 +106,13 @@ impl Client {
         headers.insert("Connection", HeaderValue::from_static("keep-alive"));
         headers.insert("Content-Type", HeaderValue::from_static("application/json"));
         let client = ReqwestClient::builder().default_headers(headers).build()?;
+        let host = Url::parse(host)?;
+        let disabled = is_disabled_host(&host);
 
         Ok(Self {
-            host: Url::parse(host)?,
+            host,
             client,
+            disabled,
         })
     }
 
@@ -116,6 +127,10 @@ impl Client {
         path: &str,
         req: &Req,
     ) -> Result<Res> {
+        if self.disabled {
+            return Err(Error::validation("Gamma desativada"));
+        }
+
         let query = req.query_params(None);
         let request = self
             .client
@@ -168,7 +183,7 @@ impl Client {
 
     /// Retrieves metadata for all supported sports.
     ///
-    /// Returns information about sports categories available on Polymarket,
+    /// Returns information about sports categories available on Kuest,
     /// including sports like NFL, NBA, MLB, etc. Useful for discovering
     /// what sports markets are available.
     ///
@@ -346,7 +361,7 @@ impl Client {
 
     /// Retrieves a list of prediction markets with optional filtering.
     ///
-    /// Markets are the core trading instruments on Polymarket. Use filters to search
+    /// Markets are the core trading instruments on Kuest. Use filters to search
     /// by tags, events, active status, or CLOB token IDs. Returns market details
     /// including current prices, volume, and outcome information.
     ///

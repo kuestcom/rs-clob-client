@@ -404,7 +404,7 @@ impl<'de> Deserialize<'de> for TickSize {
 }
 
 sol! {
-    /// Alloy solidity type representing an order in the context of the Polymarket exchange
+    /// Alloy solidity type representing an order in the context of the Kuest exchange
     ///
     /// <!-- The CLOB expects all `uint256` types, [`U256`], excluding `salt`, to be presented as a
     /// string so we must serialize as Display, which for U256 is lower hex-encoded string.

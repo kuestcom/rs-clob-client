@@ -1,14 +1,14 @@
-//! Polymarket Data API client and types.
+//! Kuest Data API client and types.
 //!
 //! **Feature flag:** `data` (required to use this module)
 //!
-//! This module provides a client for interacting with the Polymarket Data API,
+//! This module provides a client for interacting with the Kuest Data API,
 //! which offers HTTP endpoints for querying user positions, trades, activity,
 //! market holders, open interest, volume data, and leaderboards.
 //!
 //! # Overview
 //!
-//! The Data API is a read-only HTTP API that provides access to Polymarket data.
+//! The Data API is a read-only HTTP API that provides access to Kuest data.
 //! It is separate from the CLOB (Central Limit Order Book) API which handles trading.
 //!
 //! ## Available Endpoints
@@ -32,8 +32,8 @@
 //! # Example
 //!
 //! ```no_run
-//! use polymarket_client_sdk::types::address;
-//! use polymarket_client_sdk::data::{Client, types::request::PositionsRequest};
+//! use kuest_client_sdk::types::address;
+//! use kuest_client_sdk::data::{Client, types::request::PositionsRequest};
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create a client with the default endpoint
@@ -60,7 +60,7 @@
 //!
 //! # API Base URL
 //!
-//! The default API endpoint is `https://data-api.polymarket.com`.
+//! The default API endpoint is `https://data-api.kuest.com`.
 
 pub mod client;
 pub mod types;

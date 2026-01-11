@@ -12,9 +12,9 @@
 
 use std::fs::File;
 
-use polymarket_client_sdk::bridge::Client;
-use polymarket_client_sdk::bridge::types::DepositRequest;
-use polymarket_client_sdk::types::address;
+use kuest_client_sdk::bridge::Client;
+use kuest_client_sdk::bridge::types::DepositRequest;
+use kuest_client_sdk::types::address;
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt as _;

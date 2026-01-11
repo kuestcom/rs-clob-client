@@ -11,9 +11,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures_util::{SinkExt as _, StreamExt as _};
-use polymarket_client_sdk::clob::ws::{Client, WsMessage};
-use polymarket_client_sdk::types::{Address, b256};
-use polymarket_client_sdk::ws::config::Config;
+use kuest_client_sdk::clob::ws::{Client, WsMessage};
+use kuest_client_sdk::types::{Address, b256};
+use kuest_client_sdk::ws::config::Config;
 use serde_json::json;
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, mpsc};
@@ -112,10 +112,10 @@ impl MockWsServer {
 }
 
 /// Example payloads from CLOB documentation.
-/// <https://docs.polymarket.com/developers/CLOB/websocket/market-channel>
-/// <https://docs.polymarket.com/developers/CLOB/websocket/user-channel>
+/// <https://docs.kuest.com/developers/CLOB/websocket/market-channel>
+/// <https://docs.kuest.com/developers/CLOB/websocket/user-channel>
 mod payloads {
-    use polymarket_client_sdk::types::{B256, b256};
+    use kuest_client_sdk::types::{B256, b256};
     use serde_json::{Value, json};
 
     pub const ASSET_ID: &str =
@@ -407,8 +407,8 @@ mod market_channel {
 }
 
 mod user_channel {
-    use polymarket_client_sdk::auth::Credentials;
-    use polymarket_client_sdk::clob::types::Side;
+    use kuest_client_sdk::auth::Credentials;
+    use kuest_client_sdk::clob::types::Side;
     use rust_decimal_macros::dec;
     use tokio::time::sleep;
 
@@ -1099,7 +1099,7 @@ mod unsubscribe {
 }
 
 mod client_state {
-    use polymarket_client_sdk::clob::ws::ChannelType;
+    use kuest_client_sdk::clob::ws::ChannelType;
 
     use super::*;
 
@@ -1449,8 +1449,8 @@ mod custom_features {
 }
 
 mod message_parsing {
-    use polymarket_client_sdk::clob::types::Side;
-    use polymarket_client_sdk::clob::ws::{LastTradePrice, TickSizeChange};
+    use kuest_client_sdk::clob::types::Side;
+    use kuest_client_sdk::clob::ws::{LastTradePrice, TickSizeChange};
     use rust_decimal_macros::dec;
 
     use super::*;

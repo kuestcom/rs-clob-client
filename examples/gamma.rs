@@ -17,9 +17,9 @@
 
 use std::fs::File;
 
-use polymarket_client_sdk::gamma::Client;
-use polymarket_client_sdk::gamma::types::ParentEntityType;
-use polymarket_client_sdk::gamma::types::request::{
+use kuest_client_sdk::gamma::Client;
+use kuest_client_sdk::gamma::types::ParentEntityType;
+use kuest_client_sdk::gamma::types::request::{
     CommentsByIdRequest, CommentsByUserAddressRequest, CommentsRequest, EventByIdRequest,
     EventBySlugRequest, EventTagsRequest, EventsRequest, MarketByIdRequest, MarketBySlugRequest,
     MarketTagsRequest, MarketsRequest, PublicProfileRequest, RelatedTagsByIdRequest,

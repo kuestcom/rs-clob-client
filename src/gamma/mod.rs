@@ -1,14 +1,14 @@
-//! Polymarket Gamma API client and types.
+//! Kuest Gamma API client and types.
 //!
 //! **Feature flag:** `gamma` (required to use this module)
 //!
-//! This module provides a client for interacting with the Polymarket Gamma API,
+//! This module provides a client for interacting with the Kuest Gamma API,
 //! which offers HTTP endpoints for querying events, markets, tags, series,
 //! comments, profiles, and search functionality.
 //!
 //! # Overview
 //!
-//! The Gamma API provides market and event metadata for Polymarket. It is
+//! The Gamma API provides market and event metadata for Kuest. It is
 //! separate from the CLOB (Central Limit Order Book) API which handles trading.
 //!
 //! ## Available Endpoints
@@ -41,7 +41,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use polymarket_client_sdk::gamma::{Client, types::request::EventsRequest};
+//! use kuest_client_sdk::gamma::{Client, types::request::EventsRequest};
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create a client with the default endpoint
@@ -65,7 +65,7 @@
 //!
 //! # API Base URL
 //!
-//! The default API endpoint is `https://gamma-api.polymarket.com`.
+//! The default API endpoint is `https://gamma-api.kuest.com/#disabled`.
 
 pub mod client;
 pub mod types;

@@ -30,7 +30,7 @@ use crate::ws::connection::ConnectionState;
 /// # Examples
 ///
 /// ```rust, no_run
-/// use polymarket_client_sdk::clob::ws::Client;
+/// use kuest_client_sdk::clob::ws::Client;
 /// use futures::StreamExt;
 ///
 /// #[tokio::main]
@@ -56,7 +56,7 @@ pub struct Client<S: State = Unauthenticated> {
 impl Default for Client<Unauthenticated> {
     fn default() -> Self {
         Self::new(
-            "wss://ws-subscriptions-clob.polymarket.com",
+            "wss://ws-subscriptions-clob.kuest.com",
             Config::default(),
         )
         .expect("WebSocket client with default endpoint should succeed")
@@ -77,7 +77,7 @@ struct ClientInner<S: State> {
 impl Client<Unauthenticated> {
     /// Create a new unauthenticated WebSocket client.
     ///
-    /// The `endpoint` should be the base WebSocket URL (e.g. `wss://...polymarket.com`);
+    /// The `endpoint` should be the base WebSocket URL (e.g. `wss://...kuest.com`);
     /// channel paths (`/ws/market` or `/ws/user`) are appended automatically.
     ///
     /// Connection to the WebSocket server is deferred until the first subscription

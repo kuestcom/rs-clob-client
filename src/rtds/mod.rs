@@ -3,12 +3,12 @@
     reason = "Re-exported names intentionally match their modules for API clarity"
 )]
 
-//! Real-Time Data Socket (RTDS) client for streaming Polymarket data.
+//! Real-Time Data Socket (RTDS) client for streaming Kuest data.
 //!
 //! **Feature flag:** `rtds` (required to use this module)
 //!
 //! This module provides a WebSocket-based client for subscribing to real-time
-//! data streams from Polymarket's RTDS service.
+//! data streams from Kuest's RTDS service.
 //!
 //! # Available Streams
 //!
@@ -19,7 +19,7 @@
 //! # Example
 //!
 //! ```rust, no_run
-//! use polymarket_client_sdk::rtds::Client;
+//! use kuest_client_sdk::rtds::Client;
 //! use futures::StreamExt;
 //!
 //! #[tokio::main]

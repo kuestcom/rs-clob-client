@@ -11,9 +11,9 @@ use std::str::FromStr as _;
 use alloy::primitives::U256;
 use chrono::{DateTime, Utc};
 use httpmock::MockServer;
-use polymarket_client_sdk::clob::types::response::OrderSummary;
-use polymarket_client_sdk::clob::types::{Amount, OrderType, Side, SignatureType, TickSize};
-use polymarket_client_sdk::types::{Address, Decimal, address};
+use kuest_client_sdk::clob::types::response::OrderSummary;
+use kuest_client_sdk::clob::types::{Amount, OrderType, Side, SignatureType, TickSize};
+use kuest_client_sdk::types::{Address, Decimal, address};
 use reqwest::StatusCode;
 use rust_decimal_macros::dec;
 
@@ -25,13 +25,13 @@ use crate::common::{
 mod lifecycle {
     use alloy::signers::Signer as _;
     use alloy::signers::local::LocalSigner;
-    use polymarket_client_sdk::POLYGON;
-    use polymarket_client_sdk::clob::{Client, Config};
-    use polymarket_client_sdk::error::Validation;
+    use kuest_client_sdk::POLYGON;
+    use kuest_client_sdk::clob::{Client, Config};
+    use kuest_client_sdk::error::Validation;
     use serde_json::json;
 
     use super::*;
-    use crate::common::{API_KEY, PASSPHRASE, POLY_ADDRESS, PRIVATE_KEY, SECRET};
+    use crate::common::{API_KEY, PASSPHRASE, KUEST_ADDRESS, PRIVATE_KEY, SECRET};
 
     #[tokio::test]
     async fn order_parameters_should_reset_on_new_order() -> anyhow::Result<()> {
@@ -75,7 +75,7 @@ mod lifecycle {
         let mock = server.mock(|when, then| {
             when.method(httpmock::Method::GET)
                 .path("/auth/derive-api-key")
-                .header(POLY_ADDRESS, signer.address().to_string().to_lowercase());
+                .header(KUEST_ADDRESS, signer.address().to_string().to_lowercase());
             then.status(StatusCode::OK).json_body(json!({
                 "apiKey": API_KEY.to_string(),
                 "passphrase": PASSPHRASE,
@@ -127,7 +127,7 @@ mod lifecycle {
         let mock = server.mock(|when, then| {
             when.method(httpmock::Method::GET)
                 .path("/auth/derive-api-key")
-                .header(POLY_ADDRESS, signer.address().to_string().to_lowercase());
+                .header(KUEST_ADDRESS, signer.address().to_string().to_lowercase());
             then.status(StatusCode::OK).json_body(json!({
                 "apiKey": API_KEY.to_string(),
                 "passphrase": PASSPHRASE,
@@ -196,7 +196,7 @@ mod lifecycle {
         let mock = server.mock(|when, then| {
             when.method(httpmock::Method::GET)
                 .path("/auth/derive-api-key")
-                .header(POLY_ADDRESS, signer.address().to_string().to_lowercase());
+                .header(KUEST_ADDRESS, signer.address().to_string().to_lowercase());
             then.status(StatusCode::OK).json_body(json!({
                 "apiKey": API_KEY.to_string(),
                 "passphrase": PASSPHRASE,
@@ -269,7 +269,7 @@ mod lifecycle {
         let mock = server.mock(|when, then| {
             when.method(httpmock::Method::GET)
                 .path("/auth/derive-api-key")
-                .header(POLY_ADDRESS, signer.address().to_string().to_lowercase());
+                .header(KUEST_ADDRESS, signer.address().to_string().to_lowercase());
             then.status(StatusCode::OK).json_body(json!({
                 "apiKey": API_KEY.to_string(),
                 "passphrase": PASSPHRASE,
@@ -382,7 +382,7 @@ mod lifecycle {
     /// explicit funder.
     #[tokio::test]
     async fn funder_auto_derived_from_signer_for_proxy_types() -> anyhow::Result<()> {
-        use polymarket_client_sdk::{POLYGON, derive_proxy_wallet, derive_safe_wallet};
+        use kuest_client_sdk::{POLYGON, derive_proxy_wallet, derive_safe_wallet};
 
         let server = MockServer::start();
         let signer = LocalSigner::from_str(PRIVATE_KEY)?.with_chain_id(Some(POLYGON));
@@ -396,7 +396,7 @@ mod lifecycle {
         server.mock(|when, then| {
             when.method(httpmock::Method::GET)
                 .path("/auth/derive-api-key")
-                .header(POLY_ADDRESS, signer.address().to_string().to_lowercase());
+                .header(KUEST_ADDRESS, signer.address().to_string().to_lowercase());
             then.status(StatusCode::OK).json_body(json!({
                 "apiKey": API_KEY.to_string(),
                 "passphrase": PASSPHRASE,
@@ -437,7 +437,7 @@ mod lifecycle {
         server.mock(|when, then| {
             when.method(httpmock::Method::GET)
                 .path("/auth/derive-api-key")
-                .header(POLY_ADDRESS, signer.address().to_string().to_lowercase());
+                .header(KUEST_ADDRESS, signer.address().to_string().to_lowercase());
             then.status(StatusCode::OK).json_body(json!({
                 "apiKey": API_KEY.to_string(),
                 "passphrase": PASSPHRASE,
@@ -486,7 +486,7 @@ mod lifecycle {
         server.mock(|when, then| {
             when.method(httpmock::Method::GET)
                 .path("/auth/derive-api-key")
-                .header(POLY_ADDRESS, signer.address().to_string().to_lowercase());
+                .header(KUEST_ADDRESS, signer.address().to_string().to_lowercase());
             then.status(StatusCode::OK).json_body(json!({
                 "apiKey": API_KEY.to_string(),
                 "passphrase": PASSPHRASE,
@@ -566,7 +566,7 @@ mod lifecycle {
 }
 
 mod limit {
-    use polymarket_client_sdk::error::Validation;
+    use kuest_client_sdk::error::Validation;
 
     use super::*;
 
@@ -1341,7 +1341,7 @@ mod limit {
 }
 
 mod market {
-    use polymarket_client_sdk::error::Validation;
+    use kuest_client_sdk::error::Validation;
     use serde_json::json;
 
     use super::*;
@@ -1392,7 +1392,7 @@ mod market {
         use super::*;
 
         mod fok {
-            use polymarket_client_sdk::error::Validation;
+            use kuest_client_sdk::error::Validation;
 
             use super::*;
 
@@ -2128,7 +2128,7 @@ mod market {
                 .unwrap_err();
 
             let msg = &err
-                .downcast_ref::<polymarket_client_sdk::error::Validation>()
+                .downcast_ref::<kuest_client_sdk::error::Validation>()
                 .unwrap()
                 .reason;
             assert_eq!(
@@ -2166,7 +2166,7 @@ mod market {
                 .unwrap_err();
 
             let msg = &err
-                .downcast_ref::<polymarket_client_sdk::error::Validation>()
+                .downcast_ref::<kuest_client_sdk::error::Validation>()
                 .unwrap()
                 .reason;
             assert_eq!(msg, "Insufficient liquidity to fill order for 1 at 100");
@@ -3142,7 +3142,7 @@ mod market {
             .await
             .unwrap_err();
         let msg = &err
-            .downcast_ref::<polymarket_client_sdk::error::Validation>()
+            .downcast_ref::<kuest_client_sdk::error::Validation>()
             .unwrap()
             .reason;
 

@@ -28,7 +28,7 @@ pub enum Side {
 
 /// The type of on-chain activity for a user.
 ///
-/// Activities represent various operations that users can perform on the Polymarket protocol.
+/// Activities represent various operations that users can perform on the Kuest protocol.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, strum_macros::Display)]
 #[serde(rename_all = "UPPERCASE")]
 #[strum(serialize_all = "UPPERCASE")]
@@ -263,8 +263,8 @@ pub enum LeaderboardOrderBy {
 /// # Example
 ///
 /// ```
-/// use polymarket_client_sdk::data::types::MarketFilter;
-/// use polymarket_client_sdk::types::b256;
+/// use kuest_client_sdk::data::types::MarketFilter;
+/// use kuest_client_sdk::types::b256;
 ///
 /// // Filter by specific markets (condition IDs)
 /// let by_markets = MarketFilter::markets([b256!("dd22472e552920b8438158ea7238bfadfa4f736aa4cee91a6b86c39ead110917")]);
@@ -345,7 +345,7 @@ impl StdError for BoundedIntError {}
 /// # Example
 ///
 /// ```
-/// use polymarket_client_sdk::data::types::TradeFilter;
+/// use kuest_client_sdk::data::types::TradeFilter;
 /// use rust_decimal_macros::dec;
 ///
 /// // Filter trades with at least $100 USDC value

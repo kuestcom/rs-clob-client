@@ -8,7 +8,7 @@ mod common;
 
 use alloy::primitives::Address;
 use httpmock::MockServer;
-use polymarket_client_sdk::clob::types::{
+use kuest_client_sdk::clob::types::{
     AcceptRfqQuoteRequest, ApproveRfqOrderRequest, CancelRfqQuoteRequest, CancelRfqRequestRequest,
     CreateRfqQuoteRequest, CreateRfqRequestRequest, RfqQuotesRequest, RfqRequestsRequest, Side,
     SignatureType,
@@ -18,7 +18,7 @@ use rust_decimal_macros::dec;
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::common::{POLY_ADDRESS, create_authenticated};
+use crate::common::{KUEST_ADDRESS, create_authenticated};
 
 mod request {
     use super::*;
@@ -31,7 +31,7 @@ mod request {
         let mock = server.mock(|when, then| {
             when.method(httpmock::Method::POST)
                 .path("/rfq/request")
-                .header_exists(POLY_ADDRESS)
+                .header_exists(KUEST_ADDRESS)
                 .json_body(json!({
                     "assetIn": "12345",
                     "assetOut": "0",
@@ -70,7 +70,7 @@ mod request {
         let mock = server.mock(|when, then| {
             when.method(httpmock::Method::DELETE)
                 .path("/rfq/request")
-                .header_exists(POLY_ADDRESS)
+                .header_exists(KUEST_ADDRESS)
                 .json_body(json!({
                     "requestId": "0196464a-a1fa-75e6-821e-31aa0794f7ad"
                 }));
@@ -95,7 +95,7 @@ mod request {
         let mock = server.mock(|when, then| {
             when.method(httpmock::Method::GET)
                 .path("/rfq/request")
-                .header_exists(POLY_ADDRESS);
+                .header_exists(KUEST_ADDRESS);
             then.status(StatusCode::OK).json_body(json!({
                 "data": [{
                     "requestId": "01968f1e-1182-71c4-9d40-172db9be82af",
@@ -139,7 +139,7 @@ mod request {
             when.method(httpmock::Method::GET)
                 .path("/rfq/request")
                 .query_param("next_cursor", "abc123")
-                .header_exists(POLY_ADDRESS);
+                .header_exists(KUEST_ADDRESS);
             then.status(StatusCode::OK).json_body(json!({
                 "data": [],
                 "next_cursor": "",
@@ -169,7 +169,7 @@ mod quote {
         let mock = server.mock(|when, then| {
             when.method(httpmock::Method::POST)
                 .path("/rfq/quote")
-                .header_exists(POLY_ADDRESS)
+                .header_exists(KUEST_ADDRESS)
                 .json_body(json!({
                     "requestId": "01968f1e-1182-71c4-9d40-172db9be82af",
                     "assetIn": "0",
@@ -208,7 +208,7 @@ mod quote {
         let mock = server.mock(|when, then| {
             when.method(httpmock::Method::DELETE)
                 .path("/rfq/quote")
-                .header_exists(POLY_ADDRESS)
+                .header_exists(KUEST_ADDRESS)
                 .json_body(json!({
                     "quoteId": "0196f484-9fbd-74c1-bfc1-75ac21c1cf84"
                 }));
@@ -233,7 +233,7 @@ mod quote {
         let mock = server.mock(|when, then| {
             when.method(httpmock::Method::GET)
                 .path("/rfq/quote")
-                .header_exists(POLY_ADDRESS);
+                .header_exists(KUEST_ADDRESS);
             then.status(StatusCode::OK).json_body(json!({
                 "data": [{
                     "quoteId": "0196f484-9fbd-74c1-bfc1-75ac21c1cf84",
@@ -282,7 +282,7 @@ mod execution {
         let mock = server.mock(|when, then| {
             when.method(httpmock::Method::POST)
                 .path("/rfq/request/accept")
-                .header_exists(POLY_ADDRESS);
+                .header_exists(KUEST_ADDRESS);
             then.status(StatusCode::OK).body("OK");
         });
 
@@ -320,7 +320,7 @@ mod execution {
         let mock = server.mock(|when, then| {
             when.method(httpmock::Method::POST)
                 .path("/rfq/quote/approve")
-                .header_exists(POLY_ADDRESS);
+                .header_exists(KUEST_ADDRESS);
             then.status(StatusCode::OK).json_body(json!({
                 "tradeIds": ["019af0f7-eb77-764f-b40f-6de8a3562e12"]
             }));
@@ -358,7 +358,7 @@ mod execution {
 }
 
 mod error_handling {
-    use polymarket_client_sdk::error::Kind;
+    use kuest_client_sdk::error::Kind;
 
     use super::*;
 

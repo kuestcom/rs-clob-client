@@ -16,7 +16,7 @@ pub use rust_decimal::Decimal;
 ///
 /// # Example
 /// ```
-/// use polymarket_client_sdk::types::dec;
+/// use kuest_client_sdk::types::dec;
 /// let price = dec!(0.55);
 /// ```
 pub use rust_decimal_macros::dec;

@@ -15,7 +15,7 @@ use crate::ws::ConnectionManager;
 use crate::ws::config::Config;
 use crate::ws::connection::ConnectionState;
 
-/// RTDS (Real-Time Data Socket) client for streaming Polymarket data.
+/// RTDS (Real-Time Data Socket) client for streaming Kuest data.
 ///
 /// - [`Client<Unauthenticated>`]: All streams, comments without auth
 /// - [`Client<Authenticated<Normal>>`]: All streams, comments with CLOB auth
@@ -23,7 +23,7 @@ use crate::ws::connection::ConnectionState;
 /// # Examples
 ///
 /// ```rust, no_run
-/// use polymarket_client_sdk::rtds::Client;
+/// use kuest_client_sdk::rtds::Client;
 /// use futures::StreamExt;
 ///
 /// #[tokio::main]
@@ -49,7 +49,7 @@ pub struct Client<S: State = Unauthenticated> {
 
 impl Default for Client<Unauthenticated> {
     fn default() -> Self {
-        Self::new("wss://ws-live-data.polymarket.com", Config::default())
+        Self::new("wss://ws-live-data.kuest.com", Config::default())
             .expect("RTDS client with default endpoint should succeed")
     }
 }
@@ -156,13 +156,13 @@ impl<S: State> Client<S> {
     /// # Example
     ///
     /// ```no_run
-    /// use polymarket_client_sdk::rtds::Client;
-    /// use polymarket_client_sdk::ws::config::Config;
+    /// use kuest_client_sdk::rtds::Client;
+    /// use kuest_client_sdk::ws::config::Config;
     /// use futures::StreamExt;
     /// use tokio::pin;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::new("wss://rtds.polymarket.com", Config::default())?;
+    /// let client = Client::new("wss://rtds.kuest.com", Config::default())?;
     /// let stream = client.subscribe_crypto_prices(Some(vec!["BTCUSDT".to_string()]))?;
     ///
     /// pin!(stream);

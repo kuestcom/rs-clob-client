@@ -11,7 +11,7 @@
 use std::time::Duration;
 
 use futures::StreamExt as _;
-use polymarket_client_sdk::clob::ws::Client;
+use kuest_client_sdk::clob::ws::Client;
 use tokio::time::timeout;
 
 #[tokio::main]
@@ -21,7 +21,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("polymarket_client_sdk=debug".parse().unwrap()),
+                .add_directive("kuest_client_sdk=debug".parse().unwrap()),
         )
         .init();
 

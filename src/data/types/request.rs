@@ -1,4 +1,4 @@
-//! Request types for the Polymarket Data API.
+//! Request types for the Kuest Data API.
 //!
 //! This module contains builder-pattern structs for each API endpoint.
 //! All request types use the [`bon`](https://docs.rs/bon) crate for the builder pattern.
@@ -57,8 +57,8 @@ fn validate_bound(
 /// # Example
 ///
 /// ```
-/// use polymarket_client_sdk::types::address;
-/// use polymarket_client_sdk::data::{types::request::PositionsRequest, types::{PositionSortBy, SortDirection}};
+/// use kuest_client_sdk::types::address;
+/// use kuest_client_sdk::data::{types::request::PositionsRequest, types::{PositionSortBy, SortDirection}};
 ///
 /// let request = PositionsRequest::builder()
 ///     .user(address!("56687bf447db6ffa42ffe2204a05edaa20f55839"))
@@ -127,8 +127,8 @@ fn filter_is_none_or_empty(f: &Option<MarketFilter>) -> bool {
 /// # Example
 ///
 /// ```
-/// use polymarket_client_sdk::types::address;
-/// use polymarket_client_sdk::data::{types::request::TradesRequest, types::{Side, TradeFilter}};
+/// use kuest_client_sdk::types::address;
+/// use kuest_client_sdk::data::{types::request::TradesRequest, types::{Side, TradeFilter}};
 /// use rust_decimal_macros::dec;
 ///
 /// let request = TradesRequest::builder()
@@ -187,8 +187,8 @@ pub struct TradesRequest {
 /// # Example
 ///
 /// ```
-/// use polymarket_client_sdk::types::address;
-/// use polymarket_client_sdk::data::{types::request::ActivityRequest, types::ActivityType};
+/// use kuest_client_sdk::types::address;
+/// use kuest_client_sdk::data::{types::request::ActivityRequest, types::ActivityType};
 ///
 /// let request = ActivityRequest::builder()
 ///     .user(address!("56687bf447db6ffa42ffe2204a05edaa20f55839"))
@@ -248,8 +248,8 @@ pub struct ActivityRequest {
 /// # Example
 ///
 /// ```
-/// use polymarket_client_sdk::data::types::request::HoldersRequest;
-/// use polymarket_client_sdk::types::b256;
+/// use kuest_client_sdk::data::types::request::HoldersRequest;
+/// use kuest_client_sdk::types::b256;
 ///
 /// let request = HoldersRequest::builder()
 ///     .markets(vec![b256!("dd22472e552920b8438158ea7238bfadfa4f736aa4cee91a6b86c39ead110917")])
@@ -371,8 +371,8 @@ pub struct LiveVolumeRequest {
 /// # Example
 ///
 /// ```
-/// use polymarket_client_sdk::types::address;
-/// use polymarket_client_sdk::data::{types::request::ClosedPositionsRequest, types::ClosedPositionSortBy};
+/// use kuest_client_sdk::types::address;
+/// use kuest_client_sdk::data::{types::request::ClosedPositionsRequest, types::ClosedPositionSortBy};
 ///
 /// let request = ClosedPositionsRequest::builder()
 ///     .user(address!("56687bf447db6ffa42ffe2204a05edaa20f55839"))
@@ -409,7 +409,7 @@ pub struct ClosedPositionsRequest {
 /// Request parameters for the `/v1/builders/leaderboard` endpoint.
 ///
 /// Fetches aggregated builder leaderboard rankings. Builders are third-party
-/// applications that integrate with Polymarket. Returns one entry per builder
+/// applications that integrate with Kuest. Returns one entry per builder
 /// with aggregated totals for the specified time period.
 ///
 /// # Optional Parameters
@@ -421,7 +421,7 @@ pub struct ClosedPositionsRequest {
 /// # Example
 ///
 /// ```
-/// use polymarket_client_sdk::data::{types::request::BuilderLeaderboardRequest, types::TimePeriod};
+/// use kuest_client_sdk::data::{types::request::BuilderLeaderboardRequest, types::TimePeriod};
 ///
 /// let request = BuilderLeaderboardRequest::builder()
 ///     .time_period(TimePeriod::Week)
@@ -454,7 +454,7 @@ pub struct BuilderLeaderboardRequest {
 /// # Example
 ///
 /// ```
-/// use polymarket_client_sdk::data::{types::request::BuilderVolumeRequest, types::TimePeriod};
+/// use kuest_client_sdk::data::{types::request::BuilderVolumeRequest, types::TimePeriod};
 ///
 /// let request = BuilderVolumeRequest::builder()
 ///     .time_period(TimePeriod::Month)
@@ -487,7 +487,7 @@ pub struct BuilderVolumeRequest {
 /// # Example
 ///
 /// ```
-/// use polymarket_client_sdk::data::{types::request::TraderLeaderboardRequest, types::{LeaderboardCategory, TimePeriod, LeaderboardOrderBy}};
+/// use kuest_client_sdk::data::{types::request::TraderLeaderboardRequest, types::{LeaderboardCategory, TimePeriod, LeaderboardOrderBy}};
 ///
 /// let request = TraderLeaderboardRequest::builder()
 ///     .category(LeaderboardCategory::Politics)

@@ -3,11 +3,11 @@
 
 mod deposit {
     use httpmock::{Method::POST, MockServer};
-    use polymarket_client_sdk::bridge::{
+    use kuest_client_sdk::bridge::{
         Client,
         types::{DepositAddresses, DepositRequest, DepositResponse},
     };
-    use polymarket_client_sdk::types::address;
+    use kuest_client_sdk::types::address;
     use reqwest::StatusCode;
     use serde_json::json;
 
@@ -117,7 +117,7 @@ mod deposit {
 
 mod supported_assets {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::bridge::{
+    use kuest_client_sdk::bridge::{
         Client,
         types::{SupportedAsset, SupportedAssetsResponse, Token},
     };
@@ -239,12 +239,12 @@ mod supported_assets {
 }
 
 mod client {
-    use polymarket_client_sdk::bridge::Client;
+    use kuest_client_sdk::bridge::Client;
 
     #[test]
     fn default_client_should_have_correct_host() {
         let client = Client::default();
-        assert_eq!(client.host().as_str(), "https://bridge.polymarket.com/");
+        assert_eq!(client.host().as_str(), "https://bridge.kuest.com/#disabled");
     }
 
     #[test]

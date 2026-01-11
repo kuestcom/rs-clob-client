@@ -5,14 +5,14 @@ use std::str::FromStr as _;
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
 use chrono::{TimeDelta, Utc};
-use polymarket_client_sdk::clob::types::request::{
+use kuest_client_sdk::clob::types::request::{
     BalanceAllowanceRequest, OrdersRequest, TradesRequest, UpdateBalanceAllowanceRequest,
     UserRewardsEarningRequest,
 };
-use polymarket_client_sdk::clob::types::{Amount, OrderType, Side};
-use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::types::Decimal;
-use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
+use kuest_client_sdk::clob::types::{Amount, OrderType, Side};
+use kuest_client_sdk::clob::{Client, Config};
+use kuest_client_sdk::types::Decimal;
+use kuest_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
 use rust_decimal_macros::dec;
 
 #[tokio::main]
@@ -23,7 +23,7 @@ async fn main() -> anyhow::Result<()> {
     let signer = LocalSigner::from_str(&private_key)?.with_chain_id(Some(POLYGON));
 
     let config = Config::builder().use_server_time(true).build();
-    let client = Client::new("https://clob.polymarket.com", config)?
+    let client = Client::new("https://clob.kuest.com", config)?
         .authentication_builder(&signer)
         .authenticate()
         .await?;
