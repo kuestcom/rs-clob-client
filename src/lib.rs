@@ -73,16 +73,16 @@ static CONFIG: phf::Map<ChainId, ContractConfig> = phf_map! {
 
 static NEG_RISK_CONFIG: phf::Map<ChainId, ContractConfig> = phf_map! {
     137_u64 => ContractConfig {
-        exchange: address!("0xe2ed8eE54fa279b1006333EbeE68192EDB141207"),
+        exchange: address!("0xccBe425A0Aa24DCEf81f2e6edE3568a1683e7cbe"),
         collateral: address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"),
         conditional_tokens: address!("0x9432978d0f8A0E1a5317DD545B4a9ad32da8AD59"),
-        neg_risk_adapter: Some(address!("0xA8D45917999a9c3833C797EFfB31e3D878e27A33")),
+        neg_risk_adapter: Some(address!("0xc26DACF369DC1eA12421B9104031Cb5a2F8C9215")),
     },
     80002_u64 => ContractConfig {
-        exchange: address!("0xe2ed8eE54fa279b1006333EbeE68192EDB141207"),
+        exchange: address!("0xccBe425A0Aa24DCEf81f2e6edE3568a1683e7cbe"),
         collateral: address!("0x29604FdE966E3AEe42d9b5451BD9912863b3B904"),
         conditional_tokens: address!("0x9432978d0f8A0E1a5317DD545B4a9ad32da8AD59"),
-        neg_risk_adapter: Some(address!("0xA8D45917999a9c3833C797EFfB31e3D878e27A33")),
+        neg_risk_adapter: Some(address!("0xc26DACF369DC1eA12421B9104031Cb5a2F8C9215")),
     },
 };
 
@@ -317,7 +317,7 @@ mod tests {
         let cfg = contract_config(AMOY, true).expect("missing config");
         assert_eq!(
             cfg.exchange,
-            address!("0xe2ed8eE54fa279b1006333EbeE68192EDB141207")
+            address!("0xccBe425A0Aa24DCEf81f2e6edE3568a1683e7cbe")
         );
     }
 
