@@ -4,7 +4,9 @@ use reqwest::{
 };
 use url::Url;
 
-use super::types::{DepositRequest, DepositResponse, SupportedAssetsResponse};
+use super::types::{
+    DepositRequest, DepositResponse, StatusRequest, StatusResponse, SupportedAssetsResponse,
+};
 use crate::error::Error;
 use crate::Result;
 
@@ -162,6 +164,47 @@ impl Client {
         let request = self
             .client()
             .request(Method::GET, format!("{}supported-assets", self.host()))
+            .build()?;
+
+        crate::request(&self.client, request, None).await
+    }
+
+    /// Get the transaction status for all deposits associated with a given deposit address.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use kuest_client_sdk::bridge::{Client, types::StatusRequest};
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::default();
+    ///
+    /// let request = StatusRequest::builder()
+    ///     .address("56687bf447db6ffa42ffe2204a05edaa20f55839")
+    ///     .build();
+    /// let response = client.status(&request).await?;
+    ///
+    /// for tx in response.transactions {
+    ///     println!(
+    ///         "Sent {} amount of token {} on chainId {} to destination chainId {} with status {:?}",
+    ///         tx.from_amount_base_unit,
+    ///         tx.from_token_address,
+    ///         tx.from_chain_id,
+    ///         tx.to_chain_id,
+    ///         tx.status
+    ///     );
+    /// }
+    /// # Ok(())
+    /// # }
+    ///
+    /// ```
+    pub async fn status(&self, request: &StatusRequest) -> Result<StatusResponse> {
+        let request = self
+            .client()
+            .request(
+                Method::GET,
+                format!("{}status/{}", self.host(), request.address),
+            )
             .build()?;
 
         crate::request(&self.client, request, None).await

@@ -10,7 +10,7 @@ use httpmock::MockServer;
 use kuest_client_sdk::POLYGON;
 use kuest_client_sdk::auth::{Credentials, ExposeSecret as _};
 use kuest_client_sdk::clob::{Client, Config};
-use kuest_client_sdk::error::{Synchronization, Validation};
+use kuest_client_sdk::error::{Kind, Synchronization, Validation};
 use reqwest::StatusCode;
 use serde_json::json;
 
@@ -217,6 +217,23 @@ async fn create_or_derive_api_key_should_succeed() -> anyhow::Result<()> {
     assert_eq!(credentials.key(), API_KEY);
     mock.assert();
     mock2.assert();
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn create_or_derive_api_key_should_propagate_network_errors() -> anyhow::Result<()> {
+    // Use an invalid host to simulate a network error (connection refused)
+    let signer = LocalSigner::from_str(PRIVATE_KEY)?.with_chain_id(Some(POLYGON));
+    let client = Client::new("http://127.0.0.1:1", Config::default())?;
+
+    let err = client
+        .create_or_derive_api_key(&signer, None)
+        .await
+        .expect_err("should fail with network error");
+
+    // Network errors should be propagated as Internal errors, not swallowed
+    assert_eq!(err.kind(), Kind::Internal);
 
     Ok(())
 }

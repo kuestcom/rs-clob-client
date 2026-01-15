@@ -1,6 +1,7 @@
 #![cfg(all(feature = "clob", feature = "ws"))]
 #![allow(
     clippy::unwrap_used,
+    clippy::missing_panics_doc,
     reason = "Do not need additional syntax for setting up tests"
 )]
 
@@ -12,7 +13,7 @@ use std::time::Duration;
 
 use futures_util::{SinkExt as _, StreamExt as _};
 use kuest_client_sdk::clob::ws::{Client, WsMessage};
-use kuest_client_sdk::types::{Address, b256};
+use kuest_client_sdk::types::{Address, U256, b256};
 use kuest_client_sdk::ws::config::Config;
 use serde_json::json;
 use tokio::net::TcpListener;
@@ -114,24 +115,37 @@ impl MockWsServer {
 /// Example payloads from CLOB documentation.
 /// <https://docs.kuest.com/developers/CLOB/websocket/market-channel>
 /// <https://docs.kuest.com/developers/CLOB/websocket/user-channel>
-mod payloads {
-    use kuest_client_sdk::types::{B256, b256};
+pub mod payloads {
+    use std::str::FromStr as _;
+
+    use kuest_client_sdk::types::{B256, U256, b256};
     use serde_json::{Value, json};
 
-    pub const ASSET_ID: &str =
+    pub const ASSET_ID_STR: &str =
         "65818619657568813474341868652308942079804919287380422192892211131408793125422";
 
-    pub const OTHER_ASSET_ID: &str =
+    pub const OTHER_ASSET_ID_STR: &str =
         "99999999999999999999999999999999999999999999999999999999999999999";
     pub const MARKET_STR: &str =
         "0xbd31dc8a20211944f6b70f31557f1001557b59905b7738480ca09bd4532f84af";
     pub const MARKET: B256 =
         b256!("bd31dc8a20211944f6b70f31557f1001557b59905b7738480ca09bd4532f84af");
 
+    #[must_use]
+    pub fn asset_id() -> U256 {
+        U256::from_str(ASSET_ID_STR).unwrap()
+    }
+
+    #[must_use]
+    pub fn other_asset_id() -> U256 {
+        U256::from_str(OTHER_ASSET_ID_STR).unwrap()
+    }
+
+    #[must_use]
     pub fn book() -> Value {
         json!({
             "event_type": "book",
-            "asset_id": ASSET_ID,
+            "asset_id": ASSET_ID_STR,
             "market": MARKET_STR,
             "bids": [
                 { "price": ".48", "size": "30" },
@@ -148,12 +162,13 @@ mod payloads {
         })
     }
 
-    pub fn price_change_batch(asset_id: &str) -> Value {
+    #[must_use]
+    pub fn price_change_batch(asset_id: U256) -> Value {
         json!({
             "market": "0x5f65177b394277fd294cd75650044e32ba009a95022d88a0c1d565897d72f8f1",
             "price_changes": [
                 {
-                    "asset_id": asset_id,
+                    "asset_id": asset_id.to_string(),
                     "price": "0.5",
                     "size": "200",
                     "side": "BUY",
@@ -167,10 +182,11 @@ mod payloads {
         })
     }
 
+    #[must_use]
     pub fn tick_size_change() -> Value {
         json!({
             "event_type": "tick_size_change",
-            "asset_id": ASSET_ID,
+            "asset_id": ASSET_ID_STR,
             "market": MARKET_STR,
             "old_tick_size": "0.01",
             "new_tick_size": "0.001",
@@ -178,6 +194,7 @@ mod payloads {
         })
     }
 
+    #[must_use]
     pub fn last_trade_price(asset_id: &str) -> Value {
         json!({
             "asset_id": asset_id,
@@ -191,6 +208,7 @@ mod payloads {
         })
     }
 
+    #[must_use]
     pub fn trade() -> Value {
         json!({
             "asset_id": "52114319501245915516055106046884209969926127482827954674443846427813813222426",
@@ -222,6 +240,7 @@ mod payloads {
         })
     }
 
+    #[must_use]
     pub fn order() -> Value {
         json!({
             "asset_id": "52114319501245915516055106046884209969926127482827954674443846427813813222426",
@@ -243,10 +262,12 @@ mod payloads {
 }
 
 mod market_channel {
+    use std::str::FromStr as _;
+
     use rust_decimal_macros::dec;
 
     use super::*;
-    use crate::payloads::OTHER_ASSET_ID;
+    use crate::payloads::OTHER_ASSET_ID_STR;
 
     #[tokio::test]
     async fn subscribe_orderbook_receives_book_updates() {
@@ -257,14 +278,14 @@ mod market_channel {
         let client = Client::new(&endpoint, config).unwrap();
 
         let stream = client
-            .subscribe_orderbook(vec![payloads::ASSET_ID.to_owned()])
+            .subscribe_orderbook(vec![payloads::asset_id()])
             .unwrap();
         let mut stream = Box::pin(stream);
 
         // Verify subscription request was sent
         let sub_request = server.recv_subscription().await.unwrap();
         assert!(sub_request.contains("\"type\":\"market\""));
-        assert!(sub_request.contains(payloads::ASSET_ID));
+        assert!(sub_request.contains(&payloads::asset_id().to_string()));
 
         // Send book update from docs
         server.send(&payloads::book().to_string());
@@ -273,7 +294,7 @@ mod market_channel {
         let result = timeout(Duration::from_secs(2), stream.next()).await;
         let book = result.unwrap().unwrap().unwrap();
 
-        assert_eq!(book.asset_id, payloads::ASSET_ID);
+        assert_eq!(book.asset_id, payloads::asset_id());
         assert_eq!(book.market, payloads::MARKET);
         assert_eq!(book.bids.len(), 3);
         assert_eq!(book.asks.len(), 3);
@@ -291,9 +312,11 @@ mod market_channel {
         let config = Config::default();
         let client = Client::new(&endpoint, config).unwrap();
 
-        let asset_id =
-            "71321045679252212594626385532706912750332728571942532289631379312455583992563";
-        let stream = client.subscribe_prices(vec![asset_id.to_owned()]).unwrap();
+        let asset_id = U256::from_str(
+            "71321045679252212594626385532706912750332728571942532289631379312455583992563",
+        )
+        .unwrap();
+        let stream = client.subscribe_prices(vec![asset_id]).unwrap();
         let mut stream = Box::pin(stream);
 
         let _: Option<String> = server.recv_subscription().await;
@@ -312,6 +335,37 @@ mod market_channel {
     }
 
     #[tokio::test]
+    async fn subscribe_tick_size_change_receives_updates() {
+        let mut server = MockWsServer::start().await;
+        let endpoint = server.ws_url("/ws/market");
+
+        let config = Config::default();
+        let client = Client::new(&endpoint, config).unwrap();
+
+        let stream = client
+            .subscribe_tick_size_change(vec![payloads::asset_id()])
+            .unwrap();
+        let mut stream = Box::pin(stream);
+
+        // Verify subscription request was sent
+        let sub_request = server.recv_subscription().await.unwrap();
+        assert!(sub_request.contains("\"type\":\"market\""));
+        assert!(sub_request.contains(&payloads::asset_id().to_string()));
+
+        // Send tick size change event
+        server.send(&payloads::tick_size_change().to_string());
+
+        let result = timeout(Duration::from_secs(2), stream.next()).await;
+        let tsc = result.unwrap().unwrap().unwrap();
+
+        assert_eq!(tsc.asset_id, payloads::asset_id());
+        assert_eq!(tsc.market, payloads::MARKET);
+        assert_eq!(tsc.old_tick_size, dec!(0.01));
+        assert_eq!(tsc.new_tick_size, dec!(0.001));
+        assert_eq!(tsc.timestamp, 100_000_000);
+    }
+
+    #[tokio::test]
     async fn filters_messages_by_asset_id() {
         let mut server = MockWsServer::start().await;
         let endpoint = server.ws_url("/ws/market");
@@ -319,18 +373,16 @@ mod market_channel {
         let config = Config::default();
         let client = Client::new(&endpoint, config).unwrap();
 
-        let subscribed_asset = payloads::ASSET_ID;
+        let subscribed_asset = payloads::asset_id();
 
-        let stream = client
-            .subscribe_orderbook(vec![subscribed_asset.to_owned()])
-            .unwrap();
+        let stream = client.subscribe_orderbook(vec![subscribed_asset]).unwrap();
         let mut stream = Box::pin(stream);
 
         let _: Option<String> = server.recv_subscription().await;
 
         // Send message for non-subscribed asset (should be filtered)
         let mut other_book = payloads::book();
-        other_book["asset_id"] = serde_json::Value::String(OTHER_ASSET_ID.to_owned());
+        other_book["asset_id"] = serde_json::Value::String(OTHER_ASSET_ID_STR.to_owned());
         server.send(&other_book.to_string());
 
         // Send message for subscribed asset
@@ -351,7 +403,7 @@ mod market_channel {
         let client = Client::new(&endpoint, config).unwrap();
 
         let stream = client
-            .subscribe_midpoints(vec![payloads::ASSET_ID.to_owned()])
+            .subscribe_midpoints(vec![payloads::asset_id()])
             .unwrap();
         let mut stream = Box::pin(stream);
 
@@ -365,7 +417,7 @@ mod market_channel {
         let result = timeout(Duration::from_secs(2), stream.next()).await;
         let midpoint = result.unwrap().unwrap().unwrap();
 
-        assert_eq!(midpoint.asset_id, payloads::ASSET_ID);
+        assert_eq!(midpoint.asset_id, payloads::asset_id());
         assert_eq!(midpoint.market, payloads::MARKET);
         assert_eq!(midpoint.midpoint, dec!(0.50));
     }
@@ -379,7 +431,7 @@ mod market_channel {
         let client = Client::new(&endpoint, config).unwrap();
 
         let stream = client
-            .subscribe_midpoints(vec![payloads::ASSET_ID.to_owned()])
+            .subscribe_midpoints(vec![payloads::asset_id()])
             .unwrap();
         let mut stream = Box::pin(stream);
 
@@ -388,7 +440,7 @@ mod market_channel {
         // Send book with no bids (should be skipped)
         let empty_book = json!({
             "event_type": "book",
-            "asset_id": payloads::ASSET_ID,
+            "asset_id": payloads::asset_id(),
             "market": payloads::MARKET_STR,
             "bids": [],
             "asks": [{ "price": ".52", "size": "25" }],
@@ -409,14 +461,13 @@ mod market_channel {
 mod user_channel {
     use kuest_client_sdk::auth::Credentials;
     use kuest_client_sdk::clob::types::Side;
+    use kuest_client_sdk::clob::ws::types::response::{OrderMessageType, TradeMessageStatus};
     use rust_decimal_macros::dec;
     use tokio::time::sleep;
 
     use super::*;
-    use crate::{
-        common::{API_KEY, PASSPHRASE, SECRET},
-        payloads::OTHER_ASSET_ID,
-    };
+    use crate::common::{API_KEY, PASSPHRASE, SECRET};
+    use crate::payloads::OTHER_ASSET_ID_STR;
 
     fn test_credentials() -> Credentials {
         Credentials::new(API_KEY, SECRET.to_owned(), PASSPHRASE.to_owned())
@@ -462,7 +513,7 @@ mod user_channel {
                 assert_eq!(order.original_size, Some(dec!(10)));
                 assert_eq!(order.size_matched, Some(dec!(0)));
                 assert_eq!(order.outcome, Some("YES".to_owned()));
-                assert_eq!(order.msg_type, Some("PLACEMENT".to_owned()));
+                assert_eq!(order.msg_type, Some(OrderMessageType::Placement));
             }
             other => panic!("Expected Order, got {other:?}"),
         }
@@ -499,7 +550,7 @@ mod user_channel {
                 assert_eq!(trade.price, dec!(0.57));
                 assert_eq!(trade.size, dec!(10));
                 assert_eq!(trade.side, Side::Buy);
-                assert_eq!(trade.status, "MATCHED");
+                assert_eq!(trade.status, TradeMessageStatus::Matched);
                 assert_eq!(trade.outcome, Some("YES".to_owned()));
                 assert_eq!(trade.maker_orders.len(), 1);
                 assert_eq!(trade.maker_orders[0].matched_amount, dec!(10));
@@ -588,33 +639,29 @@ mod user_channel {
 
         let client = Client::new(&endpoint, Config::default()).unwrap();
 
-        let asset_id = payloads::ASSET_ID;
+        let asset_id = payloads::asset_id();
 
         // First subscription - should send request
-        let _stream1 = client
-            .subscribe_orderbook(vec![asset_id.to_owned()])
-            .unwrap();
+        let _stream1 = client.subscribe_orderbook(vec![asset_id]).unwrap();
         let sub1 = server.recv_subscription().await.unwrap();
-        assert!(sub1.contains(asset_id));
+        assert!(sub1.contains(&asset_id.to_string()));
 
         // Second subscription to SAME asset - should NOT send request (multiplexed)
-        let _stream2 = client
-            .subscribe_orderbook(vec![asset_id.to_owned()])
-            .unwrap();
+        let _stream2 = client.subscribe_orderbook(vec![asset_id]).unwrap();
 
         // Third subscription to DIFFERENT asset - should send request
         let _stream3 = client
-            .subscribe_orderbook(vec![OTHER_ASSET_ID.to_owned()])
+            .subscribe_orderbook(vec![payloads::other_asset_id()])
             .unwrap();
 
         // The next message we receive should be for other_asset only
         let sub2 = server.recv_subscription().await.unwrap();
         assert!(
-            sub2.contains(OTHER_ASSET_ID),
+            sub2.contains(OTHER_ASSET_ID_STR),
             "Should receive subscription for new asset"
         );
         assert!(
-            !sub2.contains(asset_id),
+            !sub2.contains(&asset_id.to_string()),
             "Should NOT contain duplicate of already-subscribed asset"
         );
     }
@@ -633,25 +680,21 @@ mod user_channel {
         // Wait for connections to establish
         sleep(Duration::from_millis(100)).await;
 
-        let market = payloads::MARKET_STR;
+        let market = payloads::MARKET;
 
         // Subscribe to user events for a specific market
-        let _stream = client
-            .subscribe_user_events(vec![market.to_owned()])
-            .unwrap();
+        let _stream = client.subscribe_user_events(vec![market]).unwrap();
         let _: Option<String> = server.recv_subscription().await;
 
         // Unsubscribe from user events
-        client
-            .unsubscribe_user_events(&[market.to_owned()])
-            .unwrap();
+        client.unsubscribe_user_events(&[market]).unwrap();
 
         let unsub = server.recv_subscription().await.unwrap();
         assert!(
             unsub.contains("\"operation\":\"unsubscribe\""),
             "Should send unsubscribe request, got: {unsub}"
         );
-        assert!(unsub.contains(market));
+        assert!(unsub.contains(&market.to_string()));
     }
 
     #[tokio::test]
@@ -673,7 +716,7 @@ mod user_channel {
 
         // Should still be able to subscribe to market data
         let stream = unauth_client
-            .subscribe_orderbook(vec![payloads::ASSET_ID.to_owned()])
+            .subscribe_orderbook(vec![payloads::asset_id()])
             .unwrap();
         let mut stream = Box::pin(stream);
 
@@ -810,15 +853,13 @@ mod reconnection {
 
         let client = Client::new(&endpoint, config()).unwrap();
 
-        let asset_id = payloads::ASSET_ID;
-        let stream = client
-            .subscribe_orderbook(vec![asset_id.to_owned()])
-            .unwrap();
+        let asset_id = payloads::asset_id();
+        let stream = client.subscribe_orderbook(vec![asset_id]).unwrap();
         let mut stream = Box::pin(stream);
 
         // Verify initial subscription
         let sub_request = server.recv_subscription().await.unwrap();
-        assert!(sub_request.contains(asset_id));
+        assert!(sub_request.contains(&asset_id.to_string()));
 
         // Verify we can receive messages before disconnect
         server.send(&payloads::book().to_string());
@@ -838,7 +879,7 @@ mod reconnection {
             resub.is_some(),
             "Should receive re-subscription after reconnect"
         );
-        assert!(resub.unwrap().contains(asset_id));
+        assert!(resub.unwrap().contains(&asset_id.to_string()));
 
         // Send message after reconnection and verify it's received
         server.send(&payloads::book().to_string());
@@ -856,16 +897,16 @@ mod reconnection {
 
         let client = Client::new(&endpoint, config()).unwrap();
 
-        let asset1 = payloads::ASSET_ID;
-        let asset2 = payloads::OTHER_ASSET_ID;
+        let asset1 = payloads::asset_id();
+        let asset2 = payloads::other_asset_id();
 
         // Subscribe to both assets
-        let _stream1 = client.subscribe_orderbook(vec![asset1.to_owned()]).unwrap();
+        let _stream1 = client.subscribe_orderbook(vec![asset1]).unwrap();
         let _: Option<String> = server.recv_subscription().await;
 
-        let _stream2 = client.subscribe_orderbook(vec![asset2.to_owned()]).unwrap();
+        let _stream2 = client.subscribe_orderbook(vec![asset2]).unwrap();
         let sub2 = server.recv_subscription().await.unwrap();
-        assert!(sub2.contains(asset2));
+        assert!(sub2.contains(&asset2.to_string()));
 
         // Disconnect and reconnect
         server.disconnect_all();
@@ -877,15 +918,128 @@ mod reconnection {
         assert!(resub.is_some(), "Should receive re-subscription");
         let resub_str = resub.unwrap();
         assert!(
-            resub_str.contains(asset1) && resub_str.contains(asset2),
+            resub_str.contains(&asset1.to_string()) && resub_str.contains(&asset2.to_string()),
             "Re-subscription should contain all tracked assets, got: {resub_str}"
+        );
+    }
+
+    #[tokio::test]
+    async fn preserves_custom_features_after_reconnect() {
+        let mut server = ReconnectableMockServer::start().await;
+        let endpoint = server.ws_url("/ws/market");
+
+        let client = Client::new(&endpoint, config()).unwrap();
+
+        let asset_id = payloads::asset_id();
+
+        // Subscribe with custom features enabled (e.g., best_bid_ask)
+        let _stream = client.subscribe_best_bid_ask(vec![asset_id]).unwrap();
+
+        // Verify initial subscription has custom_feature_enabled
+        let sub_request = server.recv_subscription().await.unwrap();
+        assert!(
+            sub_request.contains("\"custom_feature_enabled\":true"),
+            "Initial subscription should have custom_feature_enabled, got: {sub_request}"
+        );
+
+        // Disconnect and reconnect
+        server.disconnect_all();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        server.allow_reconnect();
+
+        // Verify re-subscription ALSO has custom_feature_enabled
+        let resub = server.recv_subscription().await;
+        assert!(resub.is_some(), "Should receive re-subscription");
+        let resub_str = resub.unwrap();
+        assert!(
+            resub_str.contains("\"custom_feature_enabled\":true"),
+            "Re-subscription should preserve custom_feature_enabled, got: {resub_str}"
+        );
+    }
+
+    /// Test that mirrors the exact usage pattern from GitHub issue #185.
+    /// <https://github.com/Polymarket/rs-clob-client/issues/185>
+    #[tokio::test]
+    async fn best_bid_ask_stream_continues_after_reconnect() {
+        let mut server = ReconnectableMockServer::start().await;
+        let endpoint = server.ws_url("/ws/market");
+
+        let client = Client::new(&endpoint, config()).unwrap();
+
+        let asset_id = payloads::asset_id();
+
+        // Exact pattern from issue #185:
+        // let stream = client.subscribe_best_bid_ask(asset_ids)?;
+        // let mut stream = Box::pin(stream);
+        let stream = client.subscribe_best_bid_ask(vec![asset_id]).unwrap();
+        let mut stream = Box::pin(stream);
+
+        // Consume initial subscription request
+        let _: Option<String> = server.recv_subscription().await;
+
+        // Send best_bid_ask message before disconnect
+        let best_bid_ask_msg = serde_json::json!({
+            "event_type": "best_bid_ask",
+            "market": payloads::MARKET_STR,
+            "asset_id": asset_id.to_string(),
+            "best_bid": "0.48",
+            "best_ask": "0.52",
+            "spread": "0.04",
+            "timestamp": "1234567890000"
+        });
+        server.send(&best_bid_ask_msg.to_string());
+
+        // Verify we receive message before disconnect (mirrors the issue's loop pattern)
+        let msg1 = timeout(Duration::from_secs(2), stream.next()).await;
+        assert!(
+            msg1.is_ok() && msg1.unwrap().is_some(),
+            "Should receive best_bid_ask message before disconnect"
+        );
+
+        // Simulate disconnect (what the user experienced)
+        server.disconnect_all();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Allow reconnection
+        server.allow_reconnect();
+
+        // Wait for re-subscription (proves reconnection happened)
+        let resub = server.recv_subscription().await;
+        assert!(
+            resub.is_some(),
+            "Should receive re-subscription after reconnect"
+        );
+        assert!(
+            resub.unwrap().contains("\"custom_feature_enabled\":true"),
+            "Re-subscription must include custom_feature_enabled for best_bid_ask to work"
+        );
+
+        // Send best_bid_ask message AFTER reconnection
+        let best_bid_ask_msg2 = serde_json::json!({
+            "event_type": "best_bid_ask",
+            "market": payloads::MARKET_STR,
+            "asset_id": asset_id.to_string(),
+            "best_bid": "0.50",
+            "best_ask": "0.54",
+            "spread": "0.04",
+            "timestamp": "1234567891000"
+        });
+        server.send(&best_bid_ask_msg2.to_string());
+
+        // THE FIX: This should now work - stream should receive message after reconnection
+        // Before the fix, this would hang forever because the server wasn't sending
+        // best_bid_ask messages (custom_feature_enabled was not included in re-subscription)
+        let msg2 = timeout(Duration::from_secs(2), stream.next()).await;
+        assert!(
+            msg2.is_ok() && msg2.unwrap().is_some(),
+            "Should receive best_bid_ask message after reconnection - this was the bug in issue #185"
         );
     }
 }
 
 mod unsubscribe {
     use super::*;
-    use crate::payloads::OTHER_ASSET_ID;
+    use crate::payloads::OTHER_ASSET_ID_STR;
 
     #[tokio::test]
     async fn unsubscribe_sends_request_when_refcount_reaches_zero() {
@@ -894,26 +1048,22 @@ mod unsubscribe {
 
         let client = Client::new(&endpoint, Config::default()).unwrap();
 
-        let asset_id = payloads::ASSET_ID;
+        let asset_id = payloads::asset_id();
 
         // Subscribe once
-        let _stream = client
-            .subscribe_orderbook(vec![asset_id.to_owned()])
-            .unwrap();
+        let _stream = client.subscribe_orderbook(vec![asset_id]).unwrap();
         let sub = server.recv_subscription().await.unwrap();
-        assert!(sub.contains(asset_id));
+        assert!(sub.contains(&asset_id.to_string()));
 
         // Unsubscribe - should send unsubscribe request since refcount goes to 0
-        client
-            .unsubscribe_orderbook(&[asset_id.to_owned()])
-            .unwrap();
+        client.unsubscribe_orderbook(&[asset_id]).unwrap();
 
         let unsub = server.recv_subscription().await.unwrap();
         assert!(
             unsub.contains("\"operation\":\"unsubscribe\""),
             "Should send unsubscribe request, got: {unsub}"
         );
-        assert!(unsub.contains(asset_id));
+        assert!(unsub.contains(&asset_id.to_string()));
     }
 
     #[tokio::test]
@@ -923,33 +1073,27 @@ mod unsubscribe {
 
         let client = Client::new(&endpoint, Config::default()).unwrap();
 
-        let asset_id = payloads::ASSET_ID;
+        let asset_id = payloads::asset_id();
 
         // Subscribe twice to same asset
-        let _stream1 = client
-            .subscribe_orderbook(vec![asset_id.to_owned()])
-            .unwrap();
+        let _stream1 = client.subscribe_orderbook(vec![asset_id]).unwrap();
         let _: Option<String> = server.recv_subscription().await;
 
-        let _stream2 = client
-            .subscribe_orderbook(vec![asset_id.to_owned()])
-            .unwrap();
+        let _stream2 = client.subscribe_orderbook(vec![asset_id]).unwrap();
         // Second subscribe should not send (multiplexed)
 
         // Unsubscribe once - refcount goes from 2 to 1, should NOT send request
-        client
-            .unsubscribe_orderbook(&[asset_id.to_owned()])
-            .unwrap();
+        client.unsubscribe_orderbook(&[asset_id]).unwrap();
 
         // Subscribe to different asset to verify server is still responsive
         let _stream3 = client
-            .subscribe_orderbook(vec![OTHER_ASSET_ID.to_owned()])
+            .subscribe_orderbook(vec![payloads::other_asset_id()])
             .unwrap();
 
         let next_msg = server.recv_subscription().await.unwrap();
         // Should be a subscribe for OTHER_ASSET_ID, not an unsubscribe for ASSET_ID
         assert!(
-            next_msg.contains(OTHER_ASSET_ID),
+            next_msg.contains(OTHER_ASSET_ID_STR),
             "Should receive subscribe for new asset, not unsubscribe. Got: {next_msg}"
         );
         assert!(
@@ -965,33 +1109,21 @@ mod unsubscribe {
 
         let client = Client::new(&endpoint, Config::default()).unwrap();
 
-        let asset_id = payloads::ASSET_ID;
+        let asset_id = payloads::asset_id();
 
         // Subscribe three times
-        let _stream1 = client
-            .subscribe_orderbook(vec![asset_id.to_owned()])
-            .unwrap();
+        let _stream1 = client.subscribe_orderbook(vec![asset_id]).unwrap();
         let _: Option<String> = server.recv_subscription().await;
 
-        let _stream2 = client
-            .subscribe_orderbook(vec![asset_id.to_owned()])
-            .unwrap();
-        let _stream3 = client
-            .subscribe_orderbook(vec![asset_id.to_owned()])
-            .unwrap();
+        let _stream2 = client.subscribe_orderbook(vec![asset_id]).unwrap();
+        let _stream3 = client.subscribe_orderbook(vec![asset_id]).unwrap();
 
         // Unsubscribe twice - still one stream left
-        client
-            .unsubscribe_orderbook(&[asset_id.to_owned()])
-            .unwrap();
-        client
-            .unsubscribe_orderbook(&[asset_id.to_owned()])
-            .unwrap();
+        client.unsubscribe_orderbook(&[asset_id]).unwrap();
+        client.unsubscribe_orderbook(&[asset_id]).unwrap();
 
         // Third unsubscribe - now refcount hits 0, should send request
-        client
-            .unsubscribe_orderbook(&[asset_id.to_owned()])
-            .unwrap();
+        client.unsubscribe_orderbook(&[asset_id]).unwrap();
 
         let unsub = server.recv_subscription().await.unwrap();
         assert!(
@@ -1007,26 +1139,20 @@ mod unsubscribe {
 
         let client = Client::new(&endpoint, Config::default()).unwrap();
 
-        let asset_id = payloads::ASSET_ID;
+        let asset_id = payloads::asset_id();
 
         // Subscribe
-        let _stream1 = client
-            .subscribe_orderbook(vec![asset_id.to_owned()])
-            .unwrap();
+        let _stream1 = client.subscribe_orderbook(vec![asset_id]).unwrap();
         let sub1 = server.recv_subscription().await.unwrap();
-        assert!(sub1.contains(asset_id));
+        assert!(sub1.contains(&asset_id.to_string()));
 
         // Fully unsubscribe
-        client
-            .unsubscribe_orderbook(&[asset_id.to_owned()])
-            .unwrap();
+        client.unsubscribe_orderbook(&[asset_id]).unwrap();
         let unsub = server.recv_subscription().await.unwrap();
         assert!(unsub.contains("\"operation\":\"unsubscribe\""));
 
         // Re-subscribe should send a new subscription request
-        let stream2 = client
-            .subscribe_orderbook(vec![asset_id.to_owned()])
-            .unwrap();
+        let stream2 = client.subscribe_orderbook(vec![asset_id]).unwrap();
         let mut stream2 = Box::pin(stream2);
 
         let sub2 = server.recv_subscription().await.unwrap();
@@ -1034,7 +1160,7 @@ mod unsubscribe {
             sub2.contains("\"type\":\"market\""),
             "Should send new subscribe request after full unsubscribe"
         );
-        assert!(sub2.contains(asset_id));
+        assert!(sub2.contains(&asset_id.to_string()));
 
         // Verify stream works
         server.send(&payloads::book().to_string());
@@ -1054,7 +1180,7 @@ mod unsubscribe {
 
         // Subscribe to something first
         let _stream = client
-            .subscribe_orderbook(vec![payloads::ASSET_ID.to_owned()])
+            .subscribe_orderbook(vec![payloads::asset_id()])
             .unwrap();
         let _: Option<String> = server.recv_subscription().await;
 
@@ -1070,30 +1196,77 @@ mod unsubscribe {
 
         let client = Client::new(&endpoint, Config::default()).unwrap();
 
-        let asset_id = payloads::ASSET_ID;
-        let nonexistent_asset = OTHER_ASSET_ID;
+        let asset_id = payloads::asset_id();
+        let nonexistent_asset = payloads::other_asset_id();
 
         // Subscribe to one asset
-        let _stream = client
-            .subscribe_orderbook(vec![asset_id.to_owned()])
-            .unwrap();
+        let _stream = client.subscribe_orderbook(vec![asset_id]).unwrap();
         let _: Option<String> = server.recv_subscription().await;
 
         // Unsubscribe from asset we never subscribed to - should be no-op
-        client
-            .unsubscribe_orderbook(&[nonexistent_asset.to_owned()])
-            .unwrap();
+        client.unsubscribe_orderbook(&[nonexistent_asset]).unwrap();
 
         // Subscribe to another asset to verify server didn't receive unsubscribe
-        let _stream2 = client
-            .subscribe_orderbook(vec![nonexistent_asset.to_owned()])
-            .unwrap();
+        let _stream2 = client.subscribe_orderbook(vec![nonexistent_asset]).unwrap();
 
         let next_msg = server.recv_subscription().await.unwrap();
         // Should be a subscribe, not an unsubscribe
         assert!(
             next_msg.contains("\"type\":\"market\""),
             "Should receive subscribe, not unsubscribe for non-existent sub. Got: {next_msg}"
+        );
+    }
+
+    /// Stress test for concurrent subscribe/unsubscribe operations.
+    ///
+    /// This test verifies that the atomic reference counting in
+    /// `SubscriptionManager` prevents race conditions when multiple
+    /// tasks subscribe and unsubscribe to the same asset concurrently.
+    ///
+    /// The test creates N concurrent tasks that each subscribe and
+    /// unsubscribe in a loop, then verifies that the final state is
+    /// consistent (either fully subscribed or fully unsubscribed).
+    #[tokio::test]
+    async fn concurrent_subscribe_unsubscribe_maintains_consistency() {
+        const NUM_TASKS: usize = 10;
+        const ITERATIONS: usize = 50;
+
+        let server = MockWsServer::start().await;
+        let endpoint = server.ws_url("/ws/market");
+
+        let client = Arc::new(Client::new(&endpoint, Config::default()).unwrap());
+        let asset_id = payloads::asset_id();
+
+        // Spawn multiple tasks that race to subscribe and unsubscribe
+        let mut handles = Vec::with_capacity(NUM_TASKS);
+        for _ in 0..NUM_TASKS {
+            let client = Arc::clone(&client);
+            let handle = tokio::spawn(async move {
+                for _ in 0..ITERATIONS {
+                    // Subscribe
+                    let _stream = client.subscribe_orderbook(vec![asset_id]).unwrap();
+
+                    // Small yield to increase interleaving
+                    tokio::task::yield_now().await;
+
+                    // Unsubscribe
+                    client.unsubscribe_orderbook(&[asset_id]).unwrap();
+                }
+            });
+            handles.push(handle);
+        }
+
+        // Wait for all tasks to complete
+        for handle in handles {
+            handle.await.expect("task should not panic");
+        }
+
+        // Final verification: after all tasks complete, subscription count should be 0
+        // This verifies no reference count corruption occurred during concurrent operations
+        assert_eq!(
+            client.subscription_count(),
+            0,
+            "All subscriptions should be cleaned up after concurrent operations"
         );
     }
 }
@@ -1124,7 +1297,7 @@ mod client_state {
 
         // Subscribe to trigger connection
         let _stream = client
-            .subscribe_orderbook(vec![payloads::ASSET_ID.to_owned()])
+            .subscribe_orderbook(vec![payloads::asset_id()])
             .unwrap();
         let _: Option<String> = server.recv_subscription().await;
 
@@ -1142,7 +1315,7 @@ mod client_state {
 
         // Subscribe to trigger connection
         let _stream = client
-            .subscribe_orderbook(vec![payloads::ASSET_ID.to_owned()])
+            .subscribe_orderbook(vec![payloads::asset_id()])
             .unwrap();
         let _: Option<String> = server.recv_subscription().await;
 
@@ -1162,14 +1335,14 @@ mod client_state {
         let client = Client::new(&endpoint, Config::default()).unwrap();
 
         let _stream1 = client
-            .subscribe_orderbook(vec![payloads::ASSET_ID.to_owned()])
+            .subscribe_orderbook(vec![payloads::asset_id()])
             .unwrap();
         let _: Option<String> = server.recv_subscription().await;
 
         assert_eq!(client.subscription_count(), 1);
 
         let _stream2 = client
-            .subscribe_prices(vec![payloads::OTHER_ASSET_ID.to_owned()])
+            .subscribe_prices(vec![payloads::other_asset_id()])
             .unwrap();
         let _: Option<String> = server.recv_subscription().await;
 
@@ -1187,18 +1360,39 @@ mod unsubscribe_variants {
 
         let client = Client::new(&endpoint, Config::default()).unwrap();
 
-        let asset_id = payloads::ASSET_ID;
+        let asset_id = payloads::asset_id();
 
         // Subscribe via prices
-        let _stream = client.subscribe_prices(vec![asset_id.to_owned()]).unwrap();
+        let _stream = client.subscribe_prices(vec![asset_id]).unwrap();
         let _: Option<String> = server.recv_subscription().await;
 
         // Unsubscribe via prices
-        client.unsubscribe_prices(&[asset_id.to_owned()]).unwrap();
+        client.unsubscribe_prices(&[asset_id]).unwrap();
 
         let unsub = server.recv_subscription().await.unwrap();
         assert!(unsub.contains("\"operation\":\"unsubscribe\""));
-        assert!(unsub.contains(asset_id));
+        assert!(unsub.contains(&asset_id.to_string()));
+    }
+
+    #[tokio::test]
+    async fn unsubscribe_tick_size_change_sends_request() {
+        let mut server = MockWsServer::start().await;
+        let endpoint = server.ws_url("/ws/market");
+
+        let client = Client::new(&endpoint, Config::default()).unwrap();
+
+        let asset_id = payloads::asset_id();
+
+        // Subscribe via tick size changes
+        let _stream = client.subscribe_tick_size_change(vec![asset_id]).unwrap();
+        let _: Option<String> = server.recv_subscription().await;
+
+        // Unsubscribe via tick size changes
+        client.unsubscribe_tick_size_change(&[asset_id]).unwrap();
+
+        let unsub = server.recv_subscription().await.unwrap();
+        assert!(unsub.contains("\"operation\":\"unsubscribe\""));
+        assert!(unsub.contains(&asset_id.to_string()));
     }
 
     #[tokio::test]
@@ -1208,22 +1402,18 @@ mod unsubscribe_variants {
 
         let client = Client::new(&endpoint, Config::default()).unwrap();
 
-        let asset_id = payloads::ASSET_ID;
+        let asset_id = payloads::asset_id();
 
         // Subscribe via midpoints
-        let _stream = client
-            .subscribe_midpoints(vec![asset_id.to_owned()])
-            .unwrap();
+        let _stream = client.subscribe_midpoints(vec![asset_id]).unwrap();
         let _: Option<String> = server.recv_subscription().await;
 
         // Unsubscribe via midpoints
-        client
-            .unsubscribe_midpoints(&[asset_id.to_owned()])
-            .unwrap();
+        client.unsubscribe_midpoints(&[asset_id]).unwrap();
 
         let unsub = server.recv_subscription().await.unwrap();
         assert!(unsub.contains("\"operation\":\"unsubscribe\""));
-        assert!(unsub.contains(asset_id));
+        assert!(unsub.contains(&asset_id.to_string()));
     }
 }
 
@@ -1236,7 +1426,7 @@ mod custom_features {
         json!({
             "event_type": "best_bid_ask",
             "market": payloads::MARKET_STR,
-            "asset_id": payloads::ASSET_ID,
+            "asset_id": payloads::asset_id(),
             "best_bid": "0.48",
             "best_ask": "0.52",
             "spread": "0.04",
@@ -1252,7 +1442,7 @@ mod custom_features {
             "market": payloads::MARKET_STR,
             "slug": "will-it-rain-tomorrow",
             "description": "A test market",
-            "assets_ids": [payloads::ASSET_ID],
+            "assets_ids": [payloads::asset_id()],
             "outcomes": ["Yes", "No"],
             "timestamp": "1234567890000"
         })
@@ -1266,9 +1456,9 @@ mod custom_features {
             "market": payloads::MARKET_STR,
             "slug": "will-it-rain-tomorrow",
             "description": "A test market",
-            "assets_ids": [payloads::ASSET_ID],
+            "assets_ids": [payloads::asset_id()],
             "outcomes": ["Yes", "No"],
-            "winning_asset_id": payloads::ASSET_ID,
+            "winning_asset_id": payloads::asset_id(),
             "winning_outcome": "Yes",
             "timestamp": "1234567890000"
         })
@@ -1282,7 +1472,7 @@ mod custom_features {
         let client = Client::new(&endpoint, Config::default()).unwrap();
 
         let stream = client
-            .subscribe_best_bid_ask(vec![payloads::ASSET_ID.to_owned()])
+            .subscribe_best_bid_ask(vec![payloads::asset_id()])
             .unwrap();
         let mut stream = Box::pin(stream);
 
@@ -1297,7 +1487,7 @@ mod custom_features {
         let result = timeout(Duration::from_secs(2), stream.next()).await;
         let bba = result.unwrap().unwrap().unwrap();
 
-        assert_eq!(bba.asset_id, payloads::ASSET_ID);
+        assert_eq!(bba.asset_id, payloads::asset_id());
         assert_eq!(bba.market, payloads::MARKET);
         assert_eq!(bba.best_bid, dec!(0.48));
         assert_eq!(bba.best_ask, dec!(0.52));
@@ -1312,7 +1502,7 @@ mod custom_features {
         let client = Client::new(&endpoint, Config::default()).unwrap();
 
         let stream = client
-            .subscribe_new_markets(vec![payloads::ASSET_ID.to_owned()])
+            .subscribe_new_markets(vec![payloads::asset_id()])
             .unwrap();
         let mut stream = Box::pin(stream);
 
@@ -1330,7 +1520,7 @@ mod custom_features {
         assert_eq!(nm.question, "Will it rain tomorrow?");
         assert_eq!(nm.market, payloads::MARKET);
         assert_eq!(nm.slug, "will-it-rain-tomorrow");
-        assert_eq!(nm.asset_ids, vec![payloads::ASSET_ID]);
+        assert_eq!(nm.asset_ids, vec![payloads::asset_id()]);
         assert_eq!(nm.outcomes, vec!["Yes", "No"]);
     }
 
@@ -1342,7 +1532,7 @@ mod custom_features {
         let client = Client::new(&endpoint, Config::default()).unwrap();
 
         let stream = client
-            .subscribe_market_resolutions(vec![payloads::ASSET_ID.to_owned()])
+            .subscribe_market_resolutions(vec![payloads::asset_id()])
             .unwrap();
         let mut stream = Box::pin(stream);
 
@@ -1360,7 +1550,7 @@ mod custom_features {
         assert_eq!(mr.question, "Will it rain tomorrow?");
         assert_eq!(mr.market, payloads::MARKET);
         assert_eq!(mr.slug, "will-it-rain-tomorrow");
-        assert_eq!(mr.asset_ids, vec![payloads::ASSET_ID]);
+        assert_eq!(mr.asset_ids, vec![payloads::asset_id()]);
     }
 
     #[tokio::test]
@@ -1371,7 +1561,7 @@ mod custom_features {
         let client = Client::new(&endpoint, Config::default()).unwrap();
 
         let stream = client
-            .subscribe_best_bid_ask(vec![payloads::ASSET_ID.to_owned()])
+            .subscribe_best_bid_ask(vec![payloads::asset_id()])
             .unwrap();
         let mut stream = Box::pin(stream);
 
@@ -1397,7 +1587,7 @@ mod custom_features {
         let client = Client::new(&endpoint, Config::default()).unwrap();
 
         let stream = client
-            .subscribe_new_markets(vec![payloads::ASSET_ID.to_owned()])
+            .subscribe_new_markets(vec![payloads::asset_id()])
             .unwrap();
         let mut stream = Box::pin(stream);
 
@@ -1426,7 +1616,7 @@ mod custom_features {
         let client = Client::new(&endpoint, Config::default()).unwrap();
 
         let stream = client
-            .subscribe_market_resolutions(vec![payloads::ASSET_ID.to_owned()])
+            .subscribe_market_resolutions(vec![payloads::asset_id()])
             .unwrap();
         let mut stream = Box::pin(stream);
 
@@ -1449,6 +1639,8 @@ mod custom_features {
 }
 
 mod message_parsing {
+    use std::str::FromStr as _;
+
     use kuest_client_sdk::clob::types::Side;
     use kuest_client_sdk::clob::ws::{LastTradePrice, TickSizeChange};
     use rust_decimal_macros::dec;
@@ -1464,7 +1656,7 @@ mod message_parsing {
         let client = Client::new(&endpoint, config).unwrap();
 
         let stream = client
-            .subscribe_orderbook(vec![payloads::ASSET_ID.to_owned()])
+            .subscribe_orderbook(vec![payloads::asset_id()])
             .unwrap();
         let mut stream = Box::pin(stream);
 
@@ -1492,14 +1684,14 @@ mod message_parsing {
         let config = Config::default();
         let client = Client::new(&endpoint, config).unwrap();
 
-        let asset_a =
+        let asset_a_str =
             "71321045679252212594626385532706912750332728571942532289631379312455583992563";
-        let asset_b =
+        let asset_b_str =
             "88888888888888888888888888888888888888888888888888888888888888888888888888888";
+        let asset_a = U256::from_str(asset_a_str).unwrap();
+        let asset_b = U256::from_str(asset_b_str).unwrap();
 
-        let stream = client
-            .subscribe_prices(vec![asset_a.to_owned(), asset_b.to_owned()])
-            .unwrap();
+        let stream = client.subscribe_prices(vec![asset_a, asset_b]).unwrap();
         let mut stream = Box::pin(stream);
 
         let _: Option<String> = server.recv_subscription().await;
@@ -1509,7 +1701,7 @@ mod message_parsing {
             "market": "0x5f65177b394277fd294cd75650044e32ba009a95022d88a0c1d565897d72f8f1",
             "price_changes": [
                 {
-                    "asset_id": asset_a,
+                    "asset_id": asset_a_str,
                     "price": "0.5",
                     "size": "200",
                     "side": "BUY",
@@ -1518,7 +1710,7 @@ mod message_parsing {
                     "best_ask": "1"
                 },
                 {
-                    "asset_id": asset_b,
+                    "asset_id": asset_b_str,
                     "price": "0.75",
                     "side": "SELL"
                 }
@@ -1549,7 +1741,7 @@ mod message_parsing {
         let payload = payloads::tick_size_change().to_string();
         let tsc: TickSizeChange = serde_json::from_str(&payload).unwrap();
 
-        assert_eq!(tsc.asset_id, payloads::ASSET_ID);
+        assert_eq!(tsc.asset_id, payloads::asset_id());
         assert_eq!(tsc.market, payloads::MARKET);
         assert_eq!(tsc.old_tick_size, dec!(0.01));
         assert_eq!(tsc.new_tick_size, dec!(0.001));
@@ -1558,9 +1750,10 @@ mod message_parsing {
 
     #[test]
     fn parses_last_trade_price() {
-        let asset_id =
+        let asset_id_str =
             "114122071509644379678018727908709560226618148003371446110114509806601493071694";
-        let payload = payloads::last_trade_price(asset_id).to_string();
+        let asset_id = U256::from_str(asset_id_str).unwrap();
+        let payload = payloads::last_trade_price(asset_id_str).to_string();
         let ltp: LastTradePrice = serde_json::from_str(&payload).unwrap();
 
         assert_eq!(ltp.asset_id, asset_id);

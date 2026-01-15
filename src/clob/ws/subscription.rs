@@ -4,6 +4,7 @@
 )]
 
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, PoisonError, RwLock};
 use std::time::Instant;
 
@@ -17,6 +18,7 @@ use super::types::request::SubscriptionRequest;
 use super::types::response::WsMessage;
 use crate::Result;
 use crate::auth::Credentials;
+use crate::types::{B256, U256};
 use crate::ws::ConnectionManager;
 use crate::ws::WsError;
 use crate::ws::connection::ConnectionState;
@@ -26,9 +28,9 @@ use crate::ws::connection::ConnectionState;
 #[derive(Debug, Clone)]
 pub enum SubscriptionTarget {
     /// Subscribed to market data for specific assets.
-    Assets(Vec<String>),
+    Assets(Vec<U256>),
     /// Subscribed to user events for specific markets.
-    Markets(Vec<String>),
+    Markets(Vec<B256>),
 }
 
 impl SubscriptionTarget {
@@ -75,10 +77,13 @@ pub struct SubscriptionManager {
     active_subs: DashMap<String, SubscriptionInfo>,
     interest: Arc<InterestTracker>,
     /// Subscribed assets with reference counts (for multiplexing)
-    subscribed_assets: DashMap<String, usize>,
+    subscribed_assets: DashMap<U256, usize>,
     /// Subscribed markets with reference counts (for multiplexing)
-    subscribed_markets: DashMap<String, usize>,
+    subscribed_markets: DashMap<B256, usize>,
     last_auth: Arc<RwLock<Option<Credentials>>>,
+    /// Track if custom features were enabled for any market subscription
+    /// (enables `best_bid_ask`, `new_market`, `market_resolved` messages)
+    custom_features_enabled: AtomicBool,
 }
 
 impl SubscriptionManager {
@@ -95,6 +100,7 @@ impl SubscriptionManager {
             subscribed_assets: DashMap::new(),
             subscribed_markets: DashMap::new(),
             last_auth: Arc::new(RwLock::new(None)),
+            custom_features_enabled: AtomicBool::new(false),
         }
     }
 
@@ -140,16 +146,20 @@ impl SubscriptionManager {
     /// Re-send subscription requests for all tracked assets and markets.
     fn resubscribe_all(&self) {
         // Collect all subscribed assets
-        let assets: Vec<String> = self
-            .subscribed_assets
-            .iter()
-            .map(|r| r.key().clone())
-            .collect();
+        let assets: Vec<U256> = self.subscribed_assets.iter().map(|r| *r.key()).collect();
 
         if !assets.is_empty() {
+            let custom_features = self.custom_features_enabled.load(Ordering::Relaxed);
             #[cfg(feature = "tracing")]
-            tracing::debug!(count = assets.len(), "Re-subscribing to market assets");
-            let request = SubscriptionRequest::market(assets);
+            tracing::debug!(
+                count = assets.len(),
+                custom_features,
+                "Re-subscribing to market assets"
+            );
+            let mut request = SubscriptionRequest::market(assets);
+            if custom_features {
+                request = request.with_custom_features(true);
+            }
             if let Err(e) = self.connection.send(&request) {
                 #[cfg(feature = "tracing")]
                 tracing::warn!(%e, "Failed to re-subscribe to market channel");
@@ -166,11 +176,7 @@ impl SubscriptionManager {
             .unwrap_or_else(PoisonError::into_inner)
             .clone();
         if let Some(auth) = auth {
-            let markets: Vec<String> = self
-                .subscribed_markets
-                .iter()
-                .map(|r| r.key().clone())
-                .collect();
+            let markets: Vec<B256> = self.subscribed_markets.iter().map(|r| *r.key()).collect();
 
             #[cfg(feature = "tracing")]
             tracing::debug!(
@@ -192,8 +198,8 @@ impl SubscriptionManager {
     /// This will fail if `asset_ids` is empty.
     pub fn subscribe_market(
         &self,
-        asset_ids: Vec<String>,
-    ) -> Result<impl Stream<Item = Result<WsMessage>>> {
+        asset_ids: Vec<U256>,
+    ) -> Result<impl Stream<Item = Result<WsMessage>> + use<>> {
         self.subscribe_market_with_options(asset_ids, false)
     }
 
@@ -205,9 +211,9 @@ impl SubscriptionManager {
     /// This will fail if `asset_ids` is empty.
     pub fn subscribe_market_with_options(
         &self,
-        asset_ids: Vec<String>,
+        asset_ids: Vec<U256>,
         custom_features: bool,
-    ) -> Result<impl Stream<Item = Result<WsMessage>>> {
+    ) -> Result<impl Stream<Item = Result<WsMessage>> + use<>> {
         if asset_ids.is_empty() {
             return Err(WsError::SubscriptionFailed(
                 "asset_ids cannot be empty: at least one asset ID must be provided for subscription"
@@ -218,10 +224,15 @@ impl SubscriptionManager {
 
         self.interest.add(MessageInterest::MARKET);
 
+        // Track if custom features are enabled (for re-subscription on reconnect)
+        if custom_features {
+            self.custom_features_enabled.store(true, Ordering::Relaxed);
+        }
+
         // Increment refcounts and determine which assets are truly new
-        let new_assets: Vec<String> = asset_ids
+        let new_assets: Vec<U256> = asset_ids
             .iter()
-            .filter_map(|id| match self.subscribed_assets.entry(id.to_owned()) {
+            .filter_map(|id| match self.subscribed_assets.entry(*id) {
                 Entry::Occupied(mut o) => {
                     *o.get_mut() += 1;
                     None
@@ -253,7 +264,14 @@ impl SubscriptionManager {
         }
 
         // Register subscription
-        let sub_id = format!("market:{}", asset_ids.join(","));
+        let sub_id = format!(
+            "market:{}",
+            asset_ids
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(",")
+        );
         self.active_subs.insert(
             sub_id,
             SubscriptionInfo {
@@ -264,7 +282,7 @@ impl SubscriptionManager {
 
         // Create filtered stream with its own receiver
         let mut rx = self.connection.subscribe();
-        let asset_ids_set: HashSet<String> = asset_ids.into_iter().collect();
+        let asset_ids_set: HashSet<U256> = asset_ids.into_iter().collect();
 
         Ok(try_stream! {
             loop {
@@ -311,9 +329,9 @@ impl SubscriptionManager {
     /// Subscribe to authenticated user channel.
     pub fn subscribe_user(
         &self,
-        markets: Vec<String>,
+        markets: Vec<B256>,
         auth: &Credentials,
-    ) -> Result<impl Stream<Item = Result<WsMessage>>> {
+    ) -> Result<impl Stream<Item = Result<WsMessage>> + use<>> {
         self.interest.add(MessageInterest::USER);
 
         // Store auth for re-subscription on reconnect.
@@ -324,7 +342,7 @@ impl SubscriptionManager {
             .unwrap_or_else(PoisonError::into_inner) = Some(auth.clone());
 
         // Increment refcounts and determine which markets are truly new
-        let new_markets: Vec<String> = markets
+        let new_markets: Vec<B256> = markets
             .iter()
             .filter_map(|id| match self.subscribed_markets.entry(id.to_owned()) {
                 Entry::Occupied(mut o) => {
@@ -354,7 +372,14 @@ impl SubscriptionManager {
         }
 
         // Register subscription
-        let sub_id = format!("user:{}", markets.join(","));
+        let sub_id = format!(
+            "user:{}",
+            markets
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(",")
+        );
         self.active_subs.insert(
             sub_id,
             SubscriptionInfo {
@@ -406,12 +431,21 @@ impl SubscriptionManager {
         self.active_subs.len()
     }
 
+    /// Check if there are any subscriptions for a specific channel type.
+    #[must_use]
+    pub fn has_subscriptions(&self, channel: ChannelType) -> bool {
+        match channel {
+            ChannelType::Market => !self.subscribed_assets.is_empty(),
+            ChannelType::User => !self.subscribed_markets.is_empty(),
+        }
+    }
+
     /// Unsubscribe from market data for specific assets.
     ///
     /// This decrements the reference count for each asset. Only sends an unsubscribe
     /// request to the server when the reference count reaches zero (no other streams
     /// are using that asset).
-    pub fn unsubscribe_market(&self, asset_ids: &[String]) -> Result<()> {
+    pub fn unsubscribe_market(&self, asset_ids: &[U256]) -> Result<()> {
         if asset_ids.is_empty() {
             return Err(WsError::SubscriptionFailed(
                 "asset_ids cannot be empty: at least one asset ID must be provided for unsubscription"
@@ -422,19 +456,17 @@ impl SubscriptionManager {
 
         let mut to_unsubscribe = Vec::new();
 
-        // Decrement refcounts and collect assets that reach zero
+        // Atomically decrement refcounts and remove assets that reach zero
+        // Using Entry API to prevent TOCTOU race between decrement and removal
         for id in asset_ids {
-            if let Some(mut refcount) = self.subscribed_assets.get_mut(id) {
+            if let Entry::Occupied(mut entry) = self.subscribed_assets.entry(*id) {
+                let refcount = entry.get_mut();
                 *refcount = refcount.saturating_sub(1);
                 if *refcount == 0 {
-                    to_unsubscribe.push(id.clone());
+                    entry.remove();
+                    to_unsubscribe.push(*id);
                 }
             }
-        }
-
-        // Clean up tracking structures for zero-refcount assets
-        for id in &to_unsubscribe {
-            self.subscribed_assets.remove(id);
         }
 
         // Send unsubscribe only for zero-refcount assets
@@ -469,7 +501,7 @@ impl SubscriptionManager {
     /// This decrements the reference count for each market. Only sends an unsubscribe
     /// request to the server when the reference count reaches zero (no other streams
     /// are using that market).
-    pub fn unsubscribe_user(&self, markets: &[String]) -> Result<()> {
+    pub fn unsubscribe_user(&self, markets: &[B256]) -> Result<()> {
         if markets.is_empty() {
             return Err(WsError::SubscriptionFailed(
                 "markets cannot be empty: at least one market ID must be provided for unsubscription"
@@ -480,19 +512,17 @@ impl SubscriptionManager {
 
         let mut to_unsubscribe = Vec::new();
 
-        // Decrement refcounts and collect markets that reach zero
+        // Atomically decrement refcounts and remove markets that reach zero
+        // Using Entry API to prevent TOCTOU race between decrement and removal
         for m in markets {
-            if let Some(mut refcount) = self.subscribed_markets.get_mut(m) {
+            if let Entry::Occupied(mut entry) = self.subscribed_markets.entry(*m) {
+                let refcount = entry.get_mut();
                 *refcount = refcount.saturating_sub(1);
                 if *refcount == 0 {
-                    to_unsubscribe.push(m.clone());
+                    entry.remove();
+                    to_unsubscribe.push(*m);
                 }
             }
-        }
-
-        // Clean up tracking structures for zero-refcount markets
-        for m in &to_unsubscribe {
-            self.subscribed_markets.remove(m);
         }
 
         // Send unsubscribe only for zero-refcount markets

@@ -13,7 +13,7 @@
 use std::fs::File;
 
 use kuest_client_sdk::bridge::Client;
-use kuest_client_sdk::bridge::types::DepositRequest;
+use kuest_client_sdk::bridge::types::{DepositRequest, StatusRequest};
 use kuest_client_sdk::types::address;
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
@@ -73,6 +73,17 @@ async fn main() -> anyhow::Result<()> {
             );
         }
         Err(e) => debug!(endpoint = "deposit", error = %e),
+    }
+
+    let status_request = StatusRequest::builder()
+        .address("bc1qs82vw5pczv9uj44n4npscldkdjgfjqu7x9mlna")
+        .build();
+
+    match client.status(&status_request).await {
+        Ok(response) => {
+            info!(endpoint = "status", count = response.transactions.len());
+        }
+        Err(e) => debug!(endpoint = "status", error = %e),
     }
 
     Ok(())

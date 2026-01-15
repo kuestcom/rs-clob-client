@@ -48,7 +48,7 @@ Add the crate to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-kuest-client-sdk = "0.3"
+kuest-client-sdk = "0.4"
 ```
 
 or
@@ -83,7 +83,7 @@ Enable features in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-kuest-client-sdk = { version = "0.3", features = ["ws", "data"] }
+kuest-client-sdk = { version = "0.4", features = ["ws", "data"] }
 ```
 
 ## Re-exported Types
@@ -349,7 +349,7 @@ async fn main() -> anyhow::Result<()> {
 Real-time orderbook and user event streaming. Requires the `ws` feature.
 
 ```toml
-kuest-client-sdk = { version = "0.3", features = ["ws"] }
+kuest-client-sdk = { version = "0.4", features = ["ws"] }
 ```
 
 ```rust,ignore
@@ -431,7 +431,7 @@ async fn main() -> anyhow::Result<()> {
 }
 ```
 
-See [`examples/gamma.rs`](examples/gamma.rs) for tags, series, comments, and sports endpoints.
+See [`examples/gamma.rs`](examples/gamma/client.rs) for tags, series, comments, and sports endpoints.
 
 #### Bridge API
 Cross-chain deposits from EVM chains, Solana, and Bitcoin. Requires the `bridge` feature.

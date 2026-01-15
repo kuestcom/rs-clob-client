@@ -21,3 +21,21 @@ pub struct DepositRequest {
     /// The Kuest wallet address to generate deposit addresses for.
     pub address: Address,
 }
+
+/// Request to get deposit statuses for a given deposit address.
+///
+/// ### Note: This doesn't use the alloy Address type, since it supports Solana and Bitcoin addresses.
+///
+/// # Example
+///
+/// ```
+/// use kuest_client_sdk::bridge::types::StatusRequest;
+///
+/// let request = StatusRequest::builder().address("0x9cb12Ec30568ab763ae5891ce4b8c5C96CeD72C9").build();
+/// ```
+#[non_exhaustive]
+#[derive(Debug, Clone, Builder)]
+#[builder(on(String, into))]
+pub struct StatusRequest {
+    pub address: String,
+}

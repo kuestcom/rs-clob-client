@@ -9,8 +9,8 @@ use bon::Builder;
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_with::{
-    DefaultOnNull, NoneAsEmptyString, TimestampMilliSeconds, TimestampSeconds, TryFromInto,
-    serde_as,
+    DefaultOnError, DefaultOnNull, NoneAsEmptyString, TimestampMilliSeconds, TimestampSeconds,
+    TryFromInto, serde_as,
 };
 use sha2::{Digest as _, Sha256};
 use uuid::Uuid;
@@ -19,7 +19,7 @@ use crate::Result;
 use crate::auth::ApiKey;
 use crate::clob::types::{OrderStatusType, OrderType, Side, TickSize, TraderSide};
 use crate::serde_helpers::StringFromAny;
-use crate::types::{Address, B256, Decimal};
+use crate::types::{Address, B256, Decimal, U256};
 
 #[non_exhaustive]
 #[derive(Clone, Debug, Deserialize, Builder, PartialEq)]
@@ -31,7 +31,7 @@ pub struct MidpointResponse {
 #[derive(Clone, Debug, Default, Deserialize, Builder, PartialEq)]
 #[serde(transparent)]
 pub struct MidpointsResponse {
-    pub midpoints: HashMap<String, Decimal>,
+    pub midpoints: HashMap<U256, Decimal>,
 }
 
 #[non_exhaustive]
@@ -44,7 +44,7 @@ pub struct PriceResponse {
 #[derive(Clone, Debug, Default, Deserialize, Builder, PartialEq)]
 #[serde(transparent)]
 pub struct PricesResponse {
-    pub prices: Option<HashMap<String, HashMap<Side, Decimal>>>,
+    pub prices: Option<HashMap<U256, HashMap<Side, Decimal>>>,
 }
 
 #[non_exhaustive]
@@ -56,7 +56,7 @@ pub struct SpreadResponse {
 #[non_exhaustive]
 #[derive(Clone, Debug, Deserialize, Builder, PartialEq)]
 pub struct SpreadsResponse {
-    pub spreads: Option<HashMap<String, Decimal>>,
+    pub spreads: Option<HashMap<U256, Decimal>>,
 }
 
 #[non_exhaustive]
@@ -115,7 +115,7 @@ pub struct GeoblockResponse {
 pub struct OrderBookSummaryResponse {
     /// The market condition ID.
     pub market: B256,
-    pub asset_id: String,
+    pub asset_id: U256,
     #[serde_as(as = "TimestampMilliSeconds<String>")]
     pub timestamp: DateTime<Utc>,
     #[serde(default)]
@@ -132,6 +132,9 @@ pub struct OrderBookSummaryResponse {
     pub neg_risk: bool,
     #[serde_as(as = "TryFromInto<Decimal>")]
     pub tick_size: TickSize,
+    #[serde(default)]
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    pub last_trade_price: Option<Decimal>,
 }
 
 impl OrderBookSummaryResponse {
@@ -164,7 +167,7 @@ pub struct LastTradePriceResponse {
 #[derive(Debug, Deserialize, Builder, PartialEq)]
 #[builder(on(String, into))]
 pub struct LastTradesPricesResponse {
-    pub token_id: String,
+    pub token_id: U256,
     pub price: Decimal,
     pub side: Side,
 }
@@ -209,7 +212,7 @@ pub struct MarketResponse {
     pub notifications_enabled: bool,
     pub neg_risk: bool,
     /// The negative risk market ID (empty string if not a neg risk market).
-    #[serde_as(as = "NoneAsEmptyString")]
+    #[serde_as(as = "DefaultOnError<NoneAsEmptyString>")]
     #[serde(default)]
     pub neg_risk_market_id: Option<B256>,
     /// The negative risk request ID (empty string if not a neg risk market).
@@ -232,7 +235,7 @@ pub struct MarketResponse {
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, PartialEq)]
 #[builder(on(String, into))]
 pub struct Token {
-    pub token_id: String,
+    pub token_id: U256,
     pub outcome: String,
     pub price: Decimal,
     #[serde(default)]
@@ -326,7 +329,7 @@ pub struct OpenOrderResponse {
     pub maker_address: Address,
     /// The market condition ID.
     pub market: B256,
-    pub asset_id: String,
+    pub asset_id: U256,
     pub side: Side,
     pub original_size: Decimal,
     pub size_matched: Decimal,
@@ -367,7 +370,7 @@ pub struct TradeResponse {
     pub taker_order_id: String,
     /// The market condition ID.
     pub market: B256,
-    pub asset_id: String,
+    pub asset_id: U256,
     pub side: Side,
     pub size: Decimal,
     pub fee_rate_bps: Decimal,
@@ -403,7 +406,7 @@ pub struct NotificationResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, Builder, PartialEq)]
 #[builder(on(String, into))]
 pub struct NotificationPayload {
-    pub asset_id: String,
+    pub asset_id: U256,
     /// The market condition ID (unique market identifier).
     pub condition_id: B256,
     #[serde(rename = "eventSlug")]
@@ -435,9 +438,6 @@ pub struct NotificationPayload {
 #[non_exhaustive]
 #[allow(
     clippy::allow_attributes,
-    reason = "Bon will generate code that has an allow attribute for some reason on the `allowances` field"
-)]
-#[allow(
     clippy::allow_attributes_without_reason,
     reason = "Bon will generate code that has an allow attribute for some reason on the `allowances` field"
 )]
@@ -486,18 +486,6 @@ pub struct Rewards {
 #[non_exhaustive]
 #[derive(Debug, Clone, Serialize, Deserialize, Builder, PartialEq)]
 #[builder(on(String, into))]
-pub struct MarketInfo {
-    /// The market condition ID (unique market identifier).
-    pub condition_id: B256,
-    pub asset_id: String,
-    pub question: String,
-    pub icon: String,
-    pub slug: String,
-}
-
-#[non_exhaustive]
-#[derive(Debug, Clone, Serialize, Deserialize, Builder, PartialEq)]
-#[builder(on(String, into))]
 pub struct UserInfo {
     pub address: Address,
     pub username: String,
@@ -516,7 +504,7 @@ pub struct MakerOrder {
     pub matched_amount: Decimal,
     pub price: Decimal,
     pub fee_rate_bps: Decimal,
-    pub asset_id: String,
+    pub asset_id: U256,
     pub outcome: String,
     pub side: Side,
 }
@@ -669,7 +657,7 @@ pub struct BuilderTradeResponse {
     pub builder: Address,
     /// The market condition ID.
     pub market: B256,
-    pub asset_id: String,
+    pub asset_id: U256,
     pub side: Side,
     pub size: Decimal,
     pub size_usdc: Decimal,
@@ -769,15 +757,15 @@ pub struct RfqRequest {
     /// Unique request identifier.
     pub request_id: String,
     /// User's address.
-    pub user: Address,
+    pub user_address: Address,
     /// Proxy address (may be same as user).
-    pub proxy: Address,
+    pub proxy_address: Address,
     /// Market condition ID.
-    pub market: B256,
+    pub condition: B256,
     /// Token ID for the outcome token.
-    pub token: String,
+    pub token: U256,
     /// Complement token ID.
-    pub complement: String,
+    pub complement: U256,
     /// Order side (BUY or SELL).
     pub side: Side,
     /// Size of tokens to receive.
@@ -802,15 +790,15 @@ pub struct RfqQuote {
     /// Request ID this quote is for.
     pub request_id: String,
     /// Quoter's address.
-    pub user: Address,
+    pub user_address: Address,
     /// Proxy address (may be same as user).
-    pub proxy: Address,
+    pub proxy_address: Address,
     /// Market condition ID.
-    pub market: B256,
+    pub condition: B256,
     /// Token ID for the outcome token.
-    pub token: String,
+    pub token: U256,
     /// Complement token ID.
-    pub complement: String,
+    pub complement: U256,
     /// Order side (BUY or SELL).
     pub side: Side,
     /// Size of tokens to receive.

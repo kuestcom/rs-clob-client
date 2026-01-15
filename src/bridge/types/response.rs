@@ -1,3 +1,4 @@
+use alloy::primitives::U256;
 use bon::Builder;
 use serde::Deserialize;
 use serde_with::{DisplayFromStr, serde_as};
@@ -70,4 +71,54 @@ pub struct Token {
     pub address: String,
     /// Token decimals.
     pub decimals: u8,
+}
+
+/// Transaction status for all deposits associated with a given deposit address.
+#[non_exhaustive]
+#[serde_as]
+#[derive(Debug, Clone, Deserialize, PartialEq, Builder)]
+#[builder(on(String, into))]
+#[serde(rename_all = "camelCase")]
+pub struct StatusResponse {
+    /// List of transactions for the given address
+    pub transactions: Vec<DepositTransaction>,
+}
+
+#[non_exhaustive]
+#[serde_as]
+#[derive(Debug, Clone, Deserialize, PartialEq, Builder)]
+#[builder(on(String, into))]
+#[serde(rename_all = "camelCase")]
+pub struct DepositTransaction {
+    /// Source chain ID
+    #[serde_as(as = "DisplayFromStr")]
+    pub from_chain_id: ChainId,
+    /// Source token contract address
+    pub from_token_address: String,
+    /// Amount in base units (without decimals)
+    #[serde_as(as = "DisplayFromStr")]
+    pub from_amount_base_unit: U256,
+    /// Destination chain ID
+    #[serde_as(as = "DisplayFromStr")]
+    pub to_chain_id: ChainId,
+    /// Destination chain ID
+    pub to_token_address: Address,
+    /// Current status of the transaction
+    pub status: DepositTransactionStatus,
+    /// Transaction hash (only available when status is Completed)
+    pub tx_hash: Option<String>,
+    /// Unix timestamp in milliseconds when transaction was created (missing when status is `DepositDetected`)
+    pub created_time_ms: Option<u64>,
+}
+
+#[non_exhaustive]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum DepositTransactionStatus {
+    DepositDetected,
+    Processing,
+    OriginTxConfirmed,
+    Submitted,
+    Completed,
+    Failed,
 }

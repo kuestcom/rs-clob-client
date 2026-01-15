@@ -53,7 +53,7 @@ use crate::clob::types::{
     RfqRequestsRequest,
 };
 use crate::clob::types::{SignableOrder, SignatureType, SignedOrder, TickSize};
-use crate::error::{Error, Synchronization};
+use crate::error::{Error, Kind as ErrorKind, Synchronization};
 use crate::types::Address;
 use crate::{
     AMOY, POLYGON, Result, Timestamp, ToQueryParams as _, auth, contract_config,
@@ -396,11 +396,11 @@ struct ClientInner<S: State> {
     /// The inner [`ReqwestClient`] used to make requests to `host`.
     client: ReqwestClient,
     /// Local cache of [`TickSize`] per token ID
-    tick_sizes: DashMap<String, TickSize>,
+    tick_sizes: DashMap<U256, TickSize>,
     /// Local cache representing whether this token is part of a `neg_risk` market
-    neg_risk: DashMap<String, bool>,
+    neg_risk: DashMap<U256, bool>,
     /// Local cache representing the fee rate in basis points per token ID
-    fee_rate_bps: DashMap<String, u32>,
+    fee_rate_bps: DashMap<U256, u32>,
     /// The funder for this [`ClientInner`]. If funder is present, then `signature_type` cannot
     /// be [`SignatureType::Eoa`]. Conversely, if funder is absent, then `signature_type` cannot be
     /// [`SignatureType::Proxy`] or [`SignatureType::GnosisSafe`].
@@ -458,7 +458,12 @@ impl ClientInner<Unauthenticated> {
     ) -> Result<Credentials> {
         match self.create_api_key(signer, nonce).await {
             Ok(creds) => Ok(creds),
-            Err(_) => self.derive_api_key(signer, nonce).await,
+            Err(err) if err.kind() == ErrorKind::Status => {
+                // Only fall back to derive_api_key for HTTP status errors (server responded
+                // with an error, e.g., key already exists). Propagate network/internal errors.
+                self.derive_api_key(signer, nonce).await
+            }
+            Err(err) => Err(err),
         }
     }
 
@@ -506,6 +511,70 @@ impl<S: State> Client<S> {
         self.inner.neg_risk.clear();
     }
 
+    /// Pre-populates the tick size cache for a token, avoiding the HTTP call.
+    ///
+    /// Use this when you already have the tick size data from another source
+    /// (e.g., cached locally or retrieved from a different API).
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use kuest_client_sdk::clob::{Client, Config, types::TickSize};
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// use kuest_client_sdk::types::U256;
+    ///
+    /// let client = Client::new("https://clob.kuest.com", Config::default())?;
+    /// client.set_tick_size(U256::ZERO, TickSize::Hundredth);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_tick_size(&self, token_id: U256, tick_size: TickSize) {
+        self.inner.tick_sizes.insert(token_id, tick_size);
+    }
+
+    /// Pre-populates the neg risk cache for a token, avoiding the HTTP call.
+    ///
+    /// Use this when you already have the neg risk data from another source
+    /// (e.g., cached locally or retrieved from a different API).
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use kuest_client_sdk::clob::{Client, Config};
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// use kuest_client_sdk::types::U256;
+    ///
+    /// let client = Client::new("https://clob.kuest.com", Config::default())?;
+    /// client.set_neg_risk(U256::ZERO, true);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_neg_risk(&self, token_id: U256, neg_risk: bool) {
+        self.inner.neg_risk.insert(token_id, neg_risk);
+    }
+
+    /// Pre-populates the fee rate cache for a token, avoiding the HTTP call.
+    ///
+    /// Use this when you already have the fee rate data from another source
+    /// (e.g., cached locally or retrieved from a different API). The fee rate
+    /// is specified in basis points (bps), where 100 bps = 1%.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use kuest_client_sdk::clob::{Client, Config};
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// use kuest_client_sdk::types::U256;
+    ///
+    /// let client = Client::new("https://clob.kuest.com", Config::default())?;
+    /// client.set_fee_rate_bps(U256::ZERO, 10); // 0.10% fee
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_fee_rate_bps(&self, token_id: U256, fee_rate_bps: u32) {
+        self.inner.fee_rate_bps.insert(token_id, fee_rate_bps);
+    }
+
     /// Checks if the CLOB API is healthy and operational.
     ///
     /// Returns "OK" if the API is functioning properly. This method is useful
@@ -542,10 +611,10 @@ impl<S: State> Client<S> {
     ///
     /// Returns an error if the request fails or the token ID is invalid.
     pub async fn midpoint(&self, request: &MidpointRequest) -> Result<MidpointResponse> {
+        let params = request.query_params(None);
         let request = self
             .client()
-            .request(Method::GET, format!("{}midpoint", self.host()))
-            .query(&[("token_id", request.token_id.as_str())])
+            .request(Method::GET, format!("{}midpoint{params}", self.host()))
             .build()?;
 
         crate::request(&self.inner.client, request, None).await
@@ -578,13 +647,10 @@ impl<S: State> Client<S> {
     ///
     /// Returns an error if the request fails or the token ID is invalid.
     pub async fn price(&self, request: &PriceRequest) -> Result<PriceResponse> {
+        let params = request.query_params(None);
         let request = self
             .client()
-            .request(Method::GET, format!("{}price", self.host()))
-            .query(&[
-                ("token_id", request.token_id.as_str()),
-                ("side", &request.side.to_string()),
-            ])
+            .request(Method::GET, format!("{}price{params}", self.host()))
             .build()?;
 
         crate::request(&self.inner.client, request, None).await
@@ -637,25 +703,11 @@ impl<S: State> Client<S> {
         &self,
         request: &PriceHistoryRequest,
     ) -> Result<PriceHistoryResponse> {
-        use crate::clob::types::TimeRange;
-
-        let mut req = self
-            .client()
-            .request(Method::GET, format!("{}prices-history", self.host()))
-            .query(&[("market", request.market.to_string())]);
-
-        match request.time_range {
-            TimeRange::Interval { interval } => {
-                req = req.query(&[("interval", interval.to_string())]);
-            }
-            TimeRange::Range { start_ts, end_ts } => {
-                req = req.query(&[("startTs", start_ts), ("endTs", end_ts)]);
-            }
-        }
-
-        if let Some(fidelity) = request.fidelity {
-            req = req.query(&[("fidelity", fidelity)]);
-        }
+        let params = request.query_params(None);
+        let req = self.client().request(
+            Method::GET,
+            format!("{}prices-history{params}", self.host()),
+        );
 
         crate::request(&self.inner.client, req.build()?, None).await
     }
@@ -670,10 +722,10 @@ impl<S: State> Client<S> {
     ///
     /// Returns an error if the request fails or the token ID is invalid.
     pub async fn spread(&self, request: &SpreadRequest) -> Result<SpreadResponse> {
+        let params = request.query_params(None);
         let request = self
             .client()
-            .request(Method::GET, format!("{}spread", self.host()))
-            .query(&[("token_id", request.token_id.as_str())])
+            .request(Method::GET, format!("{}spread{params}", self.host()))
             .build()?;
 
         crate::request(&self.inner.client, request, None).await
@@ -706,8 +758,8 @@ impl<S: State> Client<S> {
     /// # Errors
     ///
     /// Returns an error if the request fails or the token ID is invalid.
-    pub async fn tick_size(&self, token_id: &str) -> Result<TickSizeResponse> {
-        if let Some(tick_size) = self.inner.tick_sizes.get(token_id) {
+    pub async fn tick_size(&self, token_id: U256) -> Result<TickSizeResponse> {
+        if let Some(tick_size) = self.inner.tick_sizes.get(&token_id) {
             #[cfg(feature = "tracing")]
             tracing::trace!(token_id = %token_id, tick_size = ?tick_size.value(), "cache hit: tick_size");
             return Ok(TickSizeResponse {
@@ -721,7 +773,7 @@ impl<S: State> Client<S> {
         let request = self
             .client()
             .request(Method::GET, format!("{}tick-size", self.host()))
-            .query(&[("token_id", token_id)])
+            .query(&[("token_id", token_id.to_string())])
             .build()?;
 
         let response =
@@ -729,7 +781,7 @@ impl<S: State> Client<S> {
 
         self.inner
             .tick_sizes
-            .insert(token_id.to_owned(), response.minimum_tick_size);
+            .insert(token_id, response.minimum_tick_size);
 
         #[cfg(feature = "tracing")]
         tracing::trace!(token_id = %token_id, "cached tick_size");
@@ -746,8 +798,8 @@ impl<S: State> Client<S> {
     /// # Errors
     ///
     /// Returns an error if the request fails or the token ID is invalid.
-    pub async fn neg_risk(&self, token_id: &str) -> Result<NegRiskResponse> {
-        if let Some(neg_risk) = self.inner.neg_risk.get(token_id) {
+    pub async fn neg_risk(&self, token_id: U256) -> Result<NegRiskResponse> {
+        if let Some(neg_risk) = self.inner.neg_risk.get(&token_id) {
             #[cfg(feature = "tracing")]
             tracing::trace!(token_id = %token_id, neg_risk = *neg_risk, "cache hit: neg_risk");
             return Ok(NegRiskResponse {
@@ -761,14 +813,12 @@ impl<S: State> Client<S> {
         let request = self
             .client()
             .request(Method::GET, format!("{}neg-risk", self.host()))
-            .query(&[("token_id", token_id)])
+            .query(&[("token_id", token_id.to_string())])
             .build()?;
 
         let response = crate::request::<NegRiskResponse>(&self.inner.client, request, None).await?;
 
-        self.inner
-            .neg_risk
-            .insert(token_id.to_owned(), response.neg_risk);
+        self.inner.neg_risk.insert(token_id, response.neg_risk);
 
         #[cfg(feature = "tracing")]
         tracing::trace!(token_id = %token_id, "cached neg_risk");
@@ -784,8 +834,8 @@ impl<S: State> Client<S> {
     /// # Errors
     ///
     /// Returns an error if the request fails or the token ID is invalid.
-    pub async fn fee_rate_bps(&self, token_id: &str) -> Result<FeeRateResponse> {
-        if let Some(base_fee) = self.inner.fee_rate_bps.get(token_id) {
+    pub async fn fee_rate_bps(&self, token_id: U256) -> Result<FeeRateResponse> {
+        if let Some(base_fee) = self.inner.fee_rate_bps.get(&token_id) {
             #[cfg(feature = "tracing")]
             tracing::trace!(token_id = %token_id, base_fee = *base_fee, "cache hit: fee_rate_bps");
             return Ok(FeeRateResponse {
@@ -799,14 +849,12 @@ impl<S: State> Client<S> {
         let request = self
             .client()
             .request(Method::GET, format!("{}fee-rate", self.host()))
-            .query(&[("token_id", token_id)])
+            .query(&[("token_id", token_id.to_string())])
             .build()?;
 
         let response = crate::request::<FeeRateResponse>(&self.inner.client, request, None).await?;
 
-        self.inner
-            .fee_rate_bps
-            .insert(token_id.to_owned(), response.base_fee);
+        self.inner.fee_rate_bps.insert(token_id, response.base_fee);
 
         #[cfg(feature = "tracing")]
         tracing::trace!(token_id = %token_id, "cached fee_rate_bps");
@@ -883,10 +931,10 @@ impl<S: State> Client<S> {
         &self,
         request: &OrderBookSummaryRequest,
     ) -> Result<OrderBookSummaryResponse> {
+        let params = request.query_params(None);
         let request = self
             .client()
-            .request(Method::GET, format!("{}book", self.host()))
-            .query(&[("token_id", request.token_id.as_str())])
+            .request(Method::GET, format!("{}book{params}", self.host()))
             .build()?;
 
         crate::request(&self.inner.client, request, None).await
@@ -925,10 +973,13 @@ impl<S: State> Client<S> {
         &self,
         request: &LastTradePriceRequest,
     ) -> Result<LastTradePriceResponse> {
+        let params = request.query_params(None);
         let request = self
             .client()
-            .request(Method::GET, format!("{}last-trade-price", self.host()))
-            .query(&[("token_id", request.token_id.as_str())])
+            .request(
+                Method::GET,
+                format!("{}last-trade-price{params}", self.host()),
+            )
             .build()?;
 
         crate::request(&self.inner.client, request, None).await
@@ -1376,8 +1427,8 @@ impl<K: Kind> Client<Authenticated<K>> {
             post_only,
         }: SignableOrder,
     ) -> Result<SignedOrder> {
-        let token_id = order.tokenId.to_string();
-        let neg_risk = self.neg_risk(&token_id).await?.neg_risk;
+        let token_id = order.tokenId;
+        let neg_risk = self.neg_risk(token_id).await?.neg_risk;
         let chain_id = signer
             .chain_id()
             .expect("Validated not none in `authenticate`");
@@ -1752,7 +1803,7 @@ impl<K: Kind> Client<Authenticated<K>> {
         date: NaiveDate,
         next_cursor: Option<String>,
     ) -> Result<Page<UserEarningResponse>> {
-        let cursor = next_cursor.map_or(String::new(), |c| format!("&next_cursor={c}"));
+        let cursor = next_cursor.map_or(String::new(), |c| format!("?next_cursor={c}"));
         let request = self
             .client()
             .request(Method::GET, format!("{}rewards/user{cursor}", self.host()))
@@ -1865,7 +1916,7 @@ impl<K: Kind> Client<Authenticated<K>> {
         &self,
         next_cursor: Option<String>,
     ) -> Result<Page<CurrentRewardResponse>> {
-        let cursor = next_cursor.map_or(String::new(), |c| format!("&next_cursor={c}"));
+        let cursor = next_cursor.map_or(String::new(), |c| format!("?next_cursor={c}"));
         let request = self
             .client()
             .request(
@@ -2245,7 +2296,10 @@ impl<K: Kind> Client<Authenticated<K>> {
         let params = request.query_params(next_cursor);
         let http_request = self
             .client()
-            .request(Method::GET, format!("{}rfq/request{params}", self.host()))
+            .request(
+                Method::GET,
+                format!("{}rfq/data/requests{params}", self.host()),
+            )
             .build()?;
         let headers = self.create_headers(&http_request).await?;
 
@@ -2303,7 +2357,10 @@ impl<K: Kind> Client<Authenticated<K>> {
         let params = request.query_params(next_cursor);
         let http_request = self
             .client()
-            .request(Method::GET, format!("{}rfq/quote{params}", self.host()))
+            .request(
+                Method::GET,
+                format!("{}rfq/data/quotes{params}", self.host()),
+            )
             .build()?;
         let headers = self.create_headers(&http_request).await?;
 

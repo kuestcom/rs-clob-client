@@ -238,6 +238,85 @@ mod supported_assets {
     }
 }
 
+mod deposit_status {
+    use alloy::primitives::{U256, address};
+    use httpmock::{Method::GET, MockServer};
+    use kuest_client_sdk::bridge::{
+        Client,
+        types::{DepositTransaction, DepositTransactionStatus, StatusRequest, StatusResponse},
+    };
+    use reqwest::StatusCode;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn deposit_status_should_succeed() -> anyhow::Result<()> {
+        let server = MockServer::start();
+        let client = Client::new(&server.base_url())?;
+
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/status/0x9cb12Ec30568ab763ae5891ce4b8c5C96CeD72C9");
+            then.status(StatusCode::OK).json_body(json!({
+                "transactions": [
+                    {
+                        "fromChainId": "1",
+                        "fromTokenAddress": "11111111111111111111111111111111",
+                        "fromAmountBaseUnit": "13566635",
+                        "toChainId": "137",
+                        "toTokenAddress": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+                        "status": "COMPLETED",
+                        "txHash": "3atr19NAiNCYt24RHM1WnzZp47RXskpTDzspJoCBBaMFwUB8fk37hFkxz35P5UEnnmWz21rb2t5wJ8pq3EE2XnxU",
+                        "createdTimeMs": 1_757_646_914_535_u64,
+
+                    },
+                    {
+                        "fromChainId": "2",
+                        "fromTokenAddress": "11111111111111111111111111111111",
+                        "fromAmountBaseUnit": "13_566_635",
+                        "toChainId": "137",
+                        "toTokenAddress": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+                        "status": "DEPOSIT_DETECTED",
+
+                    }
+                ]
+            }));
+        });
+
+        let request = StatusRequest::builder()
+            .address("0x9cb12Ec30568ab763ae5891ce4b8c5C96CeD72C9")
+            .build();
+        let response = client.status(&request).await?;
+
+        let expected = StatusResponse::builder()
+            .transactions(vec![
+                DepositTransaction::builder()
+                    .from_chain_id(1)
+                    .from_token_address("11111111111111111111111111111111")
+                    .from_amount_base_unit(U256::from(13_566_635))
+                    .to_chain_id(137)
+                    .to_token_address(address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"))
+                    .status(DepositTransactionStatus::Completed)
+                    .tx_hash("3atr19NAiNCYt24RHM1WnzZp47RXskpTDzspJoCBBaMFwUB8fk37hFkxz35P5UEnnmWz21rb2t5wJ8pq3EE2XnxU")
+                    .created_time_ms(1_757_646_914_535)
+                    .build(),
+                DepositTransaction::builder()
+                    .from_chain_id(2)
+                    .from_token_address("11111111111111111111111111111111")
+                    .from_amount_base_unit(U256::from(13_566_635))
+                    .to_chain_id(137)
+                    .to_token_address(address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"))
+                    .status(DepositTransactionStatus::DepositDetected)
+                    .build(),
+            ])
+            .build();
+
+        assert_eq!(response, expected);
+        mock.assert();
+
+        Ok(())
+    }
+}
+
 mod client {
     use kuest_client_sdk::bridge::Client;
 

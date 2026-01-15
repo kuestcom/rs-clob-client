@@ -1,13 +1,15 @@
+use bon::Builder;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::types::Decimal;
+use crate::types::{Address, Decimal};
 
 /// Top-level RTDS message wrapper.
 ///
 /// All messages received from the RTDS WebSocket connection are deserialized into this struct.
 #[non_exhaustive]
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Builder)]
 pub struct RtdsMessage {
     /// The subscription topic (e.g., `crypto_prices`, `comments`)
     pub topic: String,
@@ -54,7 +56,7 @@ impl RtdsMessage {
 
 /// Binance crypto price update payload.
 #[non_exhaustive]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Builder)]
 pub struct CryptoPrice {
     /// Trading pair symbol (lowercase concatenated, e.g., "solusdt", "btcusdt")
     pub symbol: String,
@@ -66,7 +68,7 @@ pub struct CryptoPrice {
 
 /// Chainlink price feed update payload.
 #[non_exhaustive]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Builder)]
 pub struct ChainlinkPrice {
     /// Trading pair symbol (slash-separated, e.g., "eth/usd", "btc/usd")
     pub symbol: String,
@@ -78,7 +80,7 @@ pub struct ChainlinkPrice {
 
 /// Comment event payload.
 #[non_exhaustive]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Builder)]
 pub struct Comment {
     /// Unique identifier for this comment
     pub id: String,
@@ -86,7 +88,7 @@ pub struct Comment {
     pub body: String,
     /// ISO 8601 timestamp when the comment was created
     #[serde(rename = "createdAt")]
-    pub created_at: String,
+    pub created_at: DateTime<Utc>,
     /// ID of the parent comment if this is a reply (null for top-level comments)
     #[serde(rename = "parentCommentID", default)]
     pub parent_comment_id: Option<String>,
@@ -103,22 +105,22 @@ pub struct Comment {
     pub reaction_count: i64,
     /// Polygon address for replies
     #[serde(rename = "replyAddress", default)]
-    pub reply_address: Option<String>,
+    pub reply_address: Option<Address>,
     /// Current number of reports on this comment
     #[serde(rename = "reportCount", default)]
     pub report_count: i64,
     /// Polygon address of the user who created the comment
     #[serde(rename = "userAddress")]
-    pub user_address: String,
+    pub user_address: Address,
 }
 
 /// Profile information for a comment author.
 #[non_exhaustive]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Builder)]
 pub struct CommentProfile {
     /// User profile address
     #[serde(rename = "baseAddress")]
-    pub base_address: String,
+    pub base_address: Address,
     /// Whether the username should be displayed publicly
     #[serde(rename = "displayUsernamePublic", default)]
     pub display_username_public: bool,
@@ -126,7 +128,7 @@ pub struct CommentProfile {
     pub name: String,
     /// Proxy wallet address used for transactions
     #[serde(rename = "proxyWallet", default)]
-    pub proxy_wallet: Option<String>,
+    pub proxy_wallet: Option<Address>,
     /// Generated pseudonym for the user
     #[serde(default)]
     pub pseudonym: Option<String>,
