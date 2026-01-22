@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 use crate::Result;
 use crate::auth::ApiKey;
-use crate::clob::types::{OrderStatusType, OrderType, Side, TickSize, TraderSide};
+use crate::clob::types::{OrderStatusType, OrderType, Side, TickSize, TradeStatusType, TraderSide};
 use crate::serde_helpers::StringFromAny;
 use crate::types::{Address, B256, Decimal, U256};
 
@@ -375,7 +375,7 @@ pub struct TradeResponse {
     pub size: Decimal,
     pub fee_rate_bps: Decimal,
     pub price: Decimal,
-    pub status: OrderStatusType,
+    pub status: TradeStatusType,
     #[serde_as(as = "TimestampSeconds<String>")]
     pub match_time: DateTime<Utc>,
     #[serde_as(as = "TimestampSeconds<String>")]
@@ -662,7 +662,7 @@ pub struct BuilderTradeResponse {
     pub size: Decimal,
     pub size_usdc: Decimal,
     pub price: Decimal,
-    pub status: OrderStatusType,
+    pub status: TradeStatusType,
     pub outcome: String,
     pub outcome_index: u32,
     pub owner: ApiKey,

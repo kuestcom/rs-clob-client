@@ -304,6 +304,26 @@ pub enum OrderStatusType {
 }
 
 #[non_exhaustive]
+#[derive(Clone, Debug, Display, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+#[strum(serialize_all = "UPPERCASE")]
+pub enum TradeStatusType {
+    #[serde(alias = "matched")]
+    Matched,
+    #[serde(alias = "mined")]
+    Mined,
+    #[serde(alias = "confirmed")]
+    Confirmed,
+    #[serde(alias = "retrying")]
+    Retrying,
+    #[serde(alias = "failed")]
+    Failed,
+    /// Unknown trade status type from the API (captures the raw value for debugging).
+    #[serde(untagged)]
+    Unknown(String),
+}
+
+#[non_exhaustive]
 #[derive(
     Clone, Debug, Default, Display, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize,
 )]

@@ -2,6 +2,8 @@ use bon::Builder;
 use serde::Deserialize;
 use serde_json::Value;
 use serde_with::{DisplayFromStr, NoneAsEmptyString, serde_as};
+#[cfg(feature = "tracing")]
+use tracing::warn;
 
 use crate::auth::ApiKey;
 use crate::clob::types::{Side, TraderSide};
@@ -212,7 +214,7 @@ pub struct NewMarket {
     /// Market description
     pub description: String,
     /// List of asset IDs
-    #[serde(rename = "assets_ids")]
+    #[serde(rename = "assets_ids", alias = "asset_ids")]
     pub asset_ids: Vec<U256>,
     /// List of outcomes (e.g., `["Yes", "No"]`)
     pub outcomes: Vec<String>,
@@ -242,7 +244,7 @@ pub struct MarketResolved {
     /// Market description
     pub description: String,
     /// List of asset IDs
-    #[serde(rename = "assets_ids")]
+    #[serde(rename = "assets_ids", alias = "asset_ids")]
     pub asset_ids: Vec<U256>,
     /// List of outcomes (e.g., `["Yes", "No"]`)
     pub outcomes: Vec<String>,
@@ -293,10 +295,12 @@ pub struct MakerOrder {
 }
 
 #[non_exhaustive]
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub enum TradeMessageType {
     #[serde(alias = "trade", alias = "TRADE")]
     Trade,
+    #[serde(untagged)]
+    Unknown(String),
 }
 
 #[non_exhaustive]
@@ -468,28 +472,14 @@ pub struct MidpointUpdate {
     pub timestamp: i64,
 }
 
-/// Check if a message matches the interest filter.
-fn matches_interest(msg: &WsMessage, interest: MessageInterest) -> bool {
-    match msg {
-        WsMessage::Book(_) => interest.contains(MessageInterest::BOOK),
-        WsMessage::PriceChange(_) => interest.contains(MessageInterest::PRICE_CHANGE),
-        WsMessage::TickSizeChange(_) => interest.contains(MessageInterest::TICK_SIZE),
-        WsMessage::LastTradePrice(_) => interest.contains(MessageInterest::LAST_TRADE_PRICE),
-        WsMessage::BestBidAsk(_) => interest.contains(MessageInterest::BEST_BID_ASK),
-        WsMessage::NewMarket(_) => interest.contains(MessageInterest::NEW_MARKET),
-        WsMessage::MarketResolved(_) => interest.contains(MessageInterest::MARKET_RESOLVED),
-        WsMessage::Trade(_) => interest.contains(MessageInterest::TRADE),
-        WsMessage::Order(_) => interest.contains(MessageInterest::ORDER),
-    }
-}
-
 /// Deserialize messages from the byte slice, filtering by interest.
 ///
 /// For single objects, the JSON is parsed once into a `Value`, then the `event_type` is
 /// extracted to check interest before final deserialization via `from_value()`.
 /// This avoids re-parsing the JSON text twice.
 ///
-/// For arrays, all messages are deserialized and filtered.
+/// For arrays, messages are processed one-by-one with tolerant parsing: unknown or invalid
+/// event types are skipped rather than causing the entire batch to fail.
 pub fn parse_if_interested(
     bytes: &[u8],
     interest: &MessageInterest,
@@ -513,14 +503,28 @@ pub fn parse_if_interested(
                 }
             }
         }
-        Value::Array(_) => {
-            // Array: deserialize all and filter
-            let messages: Vec<WsMessage> = serde_json::from_value(value)?;
-            Ok(messages
-                .into_iter()
-                .filter(|msg| matches_interest(msg, *interest))
-                .collect())
-        }
+        Value::Array(arr) => Ok(arr
+            .iter()
+            .filter_map(|elem| {
+                let obj = elem.as_object()?;
+                let event_type = obj.get("event_type").and_then(Value::as_str)?;
+
+                if !interest.is_interested_in_event(event_type) {
+                    return None;
+                }
+
+                serde_json::from_value(elem.clone())
+                    .inspect_err(|err| {
+                        #[cfg(feature = "tracing")]
+                        warn!(
+                            event_type = %event_type,
+                            error = %err,
+                            "Skipping unknown/invalid WS event in batch"
+                        );
+                    })
+                    .ok()
+            })
+            .collect()),
         _ => Ok(vec![]),
     }
 }
@@ -537,6 +541,20 @@ mod tests {
     // Test market condition ID
     const TEST_MARKET: B256 =
         b256!("0000000000000000000000000000000000000000000000000000000000000001");
+
+    fn matches_interest(msg: &WsMessage, interest: MessageInterest) -> bool {
+        match msg {
+            WsMessage::Book(_) => interest.contains(MessageInterest::BOOK),
+            WsMessage::PriceChange(_) => interest.contains(MessageInterest::PRICE_CHANGE),
+            WsMessage::TickSizeChange(_) => interest.contains(MessageInterest::TICK_SIZE),
+            WsMessage::LastTradePrice(_) => interest.contains(MessageInterest::LAST_TRADE_PRICE),
+            WsMessage::BestBidAsk(_) => interest.contains(MessageInterest::BEST_BID_ASK),
+            WsMessage::NewMarket(_) => interest.contains(MessageInterest::NEW_MARKET),
+            WsMessage::MarketResolved(_) => interest.contains(MessageInterest::MARKET_RESOLVED),
+            WsMessage::Trade(_) => interest.contains(MessageInterest::TRADE),
+            WsMessage::Order(_) => interest.contains(MessageInterest::ORDER),
+        }
+    }
 
     #[test]
     fn parse_book_message() {
@@ -1033,5 +1051,117 @@ mod tests {
 
         let msgs = parse_if_interested(b"true", &MessageInterest::ALL).unwrap();
         assert!(msgs.is_empty());
+    }
+
+    // New test: Batch with mixed known + unknown event_type
+    #[test]
+    fn parse_batch_with_unknown_event_type() {
+        let json = r#"[
+            {
+                "event_type": "book",
+                "asset_id": "106585164761922456203746651621390029417453862034640469075081961934906147433548",
+                "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+                "timestamp": "1234567890",
+                "bids": [{"price": "0.5", "size": "100"}],
+                "asks": []
+            },
+            {
+                "event_type": "SOME_NEW_EVENT",
+                "unknown_field": "arbitrary data",
+                "another_field": 123
+            }
+        ]"#;
+
+        let msgs = parse_if_interested(json.as_bytes(), &MessageInterest::ALL).unwrap();
+        // Should successfully parse the known message and skip the unknown one
+        assert_eq!(msgs.len(), 1);
+        assert!(matches!(&msgs[0], WsMessage::Book(_)));
+    }
+
+    // New test: TradeMessageType Unknown variant
+    #[test]
+    fn parse_trade_message_with_unknown_type() {
+        let json = r#"{
+            "event_type": "trade",
+            "id": "trade123",
+            "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+            "asset_id": "106585164761922456203746651621390029417453862034640469075081961934906147433548",
+            "side": "BUY",
+            "size": "10",
+            "price": "0.5",
+            "status": "MATCHED",
+            "type": "NEW_TYPE"
+        }"#;
+
+        let msg: WsMessage = serde_json::from_str(json).unwrap();
+        match msg {
+            WsMessage::Trade(trade) => {
+                assert_eq!(trade.id, "trade123");
+                assert_eq!(
+                    trade.msg_type,
+                    Some(TradeMessageType::Unknown("NEW_TYPE".to_owned()))
+                );
+            }
+            _ => panic!("Expected Trade message"),
+        }
+    }
+
+    // New test: Test asset_ids alias
+    #[test]
+    fn parse_new_market_with_asset_ids_alias() {
+        let json = r#"{
+            "id": "test123",
+            "question": "Test question?",
+            "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+            "slug": "test-slug",
+            "description": "Test description",
+            "asset_ids": [
+                "106585164761922456203746651621390029417453862034640469075081961934906147433548"
+            ],
+            "outcomes": ["Yes", "No"],
+            "timestamp": "1234567890",
+            "event_type": "new_market"
+        }"#;
+
+        let msg: WsMessage = serde_json::from_str(json).unwrap();
+        match msg {
+            WsMessage::NewMarket(nm) => {
+                assert_eq!(nm.id, "test123");
+                assert_eq!(nm.asset_ids.len(), 1);
+                assert_eq!(
+                    nm.asset_ids[0],
+                    U256::from_str("106585164761922456203746651621390029417453862034640469075081961934906147433548").unwrap()
+                );
+            }
+            _ => panic!("Expected NewMarket message"),
+        }
+    }
+
+    #[test]
+    fn parse_market_resolved_with_asset_ids_alias() {
+        let json = r#"{
+            "id": "test123",
+            "question": "Test question?",
+            "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+            "slug": "test-slug",
+            "description": "Test description",
+            "asset_ids": [
+                "106585164761922456203746651621390029417453862034640469075081961934906147433548"
+            ],
+            "outcomes": ["Yes", "No"],
+            "winning_asset_id": "106585164761922456203746651621390029417453862034640469075081961934906147433548",
+            "winning_outcome": "Yes",
+            "timestamp": "1234567890",
+            "event_type": "market_resolved"
+        }"#;
+
+        let msg: WsMessage = serde_json::from_str(json).unwrap();
+        match msg {
+            WsMessage::MarketResolved(mr) => {
+                assert_eq!(mr.id, "test123");
+                assert_eq!(mr.asset_ids.len(), 1);
+            }
+            _ => panic!("Expected MarketResolved message"),
+        }
     }
 }

@@ -1402,7 +1402,7 @@ mod authenticated {
     };
     use kuest_client_sdk::clob::types::{
         AssetType, OrderStatusType, OrderType, Side, SignableOrder, SignedOrder, TickSize,
-        TraderSide,
+        TradeStatusType, TraderSide,
     };
     #[cfg(feature = "heartbeats")]
     use kuest_client_sdk::error::Synchronization;
@@ -2060,7 +2060,7 @@ mod authenticated {
             .size(dec!(12.5))
             .fee_rate_bps(dec!(5))
             .price(dec!(0.42))
-            .status(OrderStatusType::Matched)
+            .status(TradeStatusType::Matched)
             .match_time("2024-01-15T12:34:56Z".parse().unwrap())
             .last_update("2024-01-15T12:35:30Z".parse().unwrap())
             .outcome("YES")
@@ -2914,7 +2914,7 @@ mod builder_authenticated {
     use kuest_client_sdk::clob::types::response::{
         BuilderApiKeyResponse, BuilderTradeResponse, Page,
     };
-    use kuest_client_sdk::clob::types::{OrderStatusType, Side};
+    use kuest_client_sdk::clob::types::{Side, TradeStatusType};
     use kuest_client_sdk::types::{address, b256};
 
     use super::*;
@@ -3198,7 +3198,7 @@ mod builder_authenticated {
             .size(dec!(10.0))
             .size_usdc(dec!(100.0))
             .price(dec!(0.45))
-            .status(OrderStatusType::Matched)
+            .status(TradeStatusType::Matched)
             .outcome("YES")
             .outcome_index(0)
             .owner(Uuid::max())
