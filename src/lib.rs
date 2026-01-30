@@ -58,43 +58,43 @@ pub(crate) type Timestamp = i64;
 
 static CONFIG: phf::Map<ChainId, ContractConfig> = phf_map! {
     137_u64 => ContractConfig {
-        exchange: address!("0xE79717fE8456C620cFde6156b6AeAd79C4875Ca2"),
+        exchange: address!("0xB5592f7CccA122558D2201e190826276f3a661cb"),
         collateral: address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"),
-        conditional_tokens: address!("0x9432978d0f8A0E1a5317DD545B4a9ad32da8AD59"),
+        conditional_tokens: address!("0x4682048725865bf17067bd85fF518527A262A9C7"),
         neg_risk_adapter: None,
     },
     80002_u64 => ContractConfig {
-        exchange: address!("0xE79717fE8456C620cFde6156b6AeAd79C4875Ca2"),
-        collateral: address!("0x29604FdE966E3AEe42d9b5451BD9912863b3B904"),
-        conditional_tokens: address!("0x9432978d0f8A0E1a5317DD545B4a9ad32da8AD59"),
+        exchange: address!("0xB5592f7CccA122558D2201e190826276f3a661cb"),
+        collateral: address!("0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582"),
+        conditional_tokens: address!("0x4682048725865bf17067bd85fF518527A262A9C7"),
         neg_risk_adapter: None,
     },
 };
 
 static NEG_RISK_CONFIG: phf::Map<ChainId, ContractConfig> = phf_map! {
     137_u64 => ContractConfig {
-        exchange: address!("0xccBe425A0Aa24DCEf81f2e6edE3568a1683e7cbe"),
+        exchange: address!("0xef02d1Ea5B42432C4E99C2785d1a4020d2FB24F5"),
         collateral: address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"),
-        conditional_tokens: address!("0x9432978d0f8A0E1a5317DD545B4a9ad32da8AD59"),
-        neg_risk_adapter: Some(address!("0xc26DACF369DC1eA12421B9104031Cb5a2F8C9215")),
+        conditional_tokens: address!("0x4682048725865bf17067bd85fF518527A262A9C7"),
+        neg_risk_adapter: Some(address!("0x724259Fe88100FE18C134324C4853975FBDa4d76")),
     },
     80002_u64 => ContractConfig {
-        exchange: address!("0xccBe425A0Aa24DCEf81f2e6edE3568a1683e7cbe"),
-        collateral: address!("0x29604FdE966E3AEe42d9b5451BD9912863b3B904"),
-        conditional_tokens: address!("0x9432978d0f8A0E1a5317DD545B4a9ad32da8AD59"),
-        neg_risk_adapter: Some(address!("0xc26DACF369DC1eA12421B9104031Cb5a2F8C9215")),
+        exchange: address!("0xef02d1Ea5B42432C4E99C2785d1a4020d2FB24F5"),
+        collateral: address!("0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582"),
+        conditional_tokens: address!("0x4682048725865bf17067bd85fF518527A262A9C7"),
+        neg_risk_adapter: Some(address!("0x724259Fe88100FE18C134324C4853975FBDa4d76")),
     },
 };
 
 // Wallet contract configurations for CREATE2 address derivation
 static WALLET_CONFIG: phf::Map<ChainId, WalletContractConfig> = phf_map! {
     137_u64 => WalletContractConfig {
-        proxy_factory: Some(address!("0xFe30Ff32E8fcB617E4665c5c94749ECc0808A6C9")),
-        safe_factory: address!("0xA28927f4a23F52d0b7253c5E3d09a1fDb22977C4"),
+        proxy_factory: Some(address!("0xc70A03a24424d934D7bd7E43de48e2Dafcc0Fe02")),
+        safe_factory: address!("0x0202c1c426C77cEE55979e4fB3496288fAba8413"),
     },
     80002_u64 => WalletContractConfig {
-        proxy_factory: Some(address!("0xFe30Ff32E8fcB617E4665c5c94749ECc0808A6C9")),
-        safe_factory: address!("0xA28927f4a23F52d0b7253c5E3d09a1fDb22977C4"),
+        proxy_factory: Some(address!("0xc70A03a24424d934D7bd7E43de48e2Dafcc0Fe02")),
+        safe_factory: address!("0x0202c1c426C77cEE55979e4fB3496288fAba8413"),
     },
 };
 
@@ -308,7 +308,7 @@ mod tests {
         let cfg = contract_config(AMOY, false).expect("missing config");
         assert_eq!(
             cfg.exchange,
-            address!("0xE79717fE8456C620cFde6156b6AeAd79C4875Ca2")
+            address!("0xB5592f7CccA122558D2201e190826276f3a661cb")
         );
     }
 
@@ -317,7 +317,7 @@ mod tests {
         let cfg = contract_config(AMOY, true).expect("missing config");
         assert_eq!(
             cfg.exchange,
-            address!("0xccBe425A0Aa24DCEf81f2e6edE3568a1683e7cbe")
+            address!("0xef02d1Ea5B42432C4E99C2785d1a4020d2FB24F5")
         );
     }
 
@@ -326,11 +326,11 @@ mod tests {
         let cfg = wallet_contract_config(POLYGON).expect("missing config");
         assert_eq!(
             cfg.proxy_factory,
-            Some(address!("0xFe30Ff32E8fcB617E4665c5c94749ECc0808A6C9"))
+            Some(address!("0xc70A03a24424d934D7bd7E43de48e2Dafcc0Fe02"))
         );
         assert_eq!(
             cfg.safe_factory,
-            address!("0xA28927f4a23F52d0b7253c5E3d09a1fDb22977C4")
+            address!("0x0202c1c426C77cEE55979e4fB3496288fAba8413")
         );
     }
 
@@ -339,11 +339,11 @@ mod tests {
         let cfg = wallet_contract_config(AMOY).expect("missing config");
         assert_eq!(
             cfg.proxy_factory,
-            Some(address!("0xFe30Ff32E8fcB617E4665c5c94749ECc0808A6C9"))
+            Some(address!("0xc70A03a24424d934D7bd7E43de48e2Dafcc0Fe02"))
         );
         assert_eq!(
             cfg.safe_factory,
-            address!("0xA28927f4a23F52d0b7253c5E3d09a1fDb22977C4")
+            address!("0x0202c1c426C77cEE55979e4fB3496288fAba8413")
         );
     }
 
