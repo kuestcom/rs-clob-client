@@ -958,8 +958,7 @@ mod reconnection {
         );
     }
 
-    /// Test that mirrors the exact usage pattern from GitHub issue #185.
-    /// <https://github.com/Polymarket/rs-clob-client/issues/185>
+    /// Test that mirrors the exact usage pattern from a reported reconnect issue.
     #[tokio::test]
     async fn best_bid_ask_stream_continues_after_reconnect() {
         let mut server = ReconnectableMockServer::start().await;
