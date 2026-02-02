@@ -1,4 +1,4 @@
-![Kuest](assets/logo.png)
+![Kuest](assets/kuest.svg)
 
 # Kuest Rust Client
 
