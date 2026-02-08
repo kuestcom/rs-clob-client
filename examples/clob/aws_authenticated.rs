@@ -28,12 +28,6 @@ use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt as _;
 use tracing_subscriber::util::SubscriberInitExt as _;
-use kuest_client_sdk::POLYGON;
-use kuest_client_sdk::clob::{Client, Config};
-use tracing::{error, info};
-use tracing_subscriber::EnvFilter;
-use tracing_subscriber::layer::SubscriberExt as _;
-use tracing_subscriber::util::SubscriberInitExt as _;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

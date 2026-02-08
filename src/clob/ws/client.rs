@@ -58,11 +58,8 @@ pub struct Client<S: State = Unauthenticated> {
 
 impl Default for Client<Unauthenticated> {
     fn default() -> Self {
-        Self::new(
-            "wss://ws-subscriptions-clob.kuest.com",
-            Config::default(),
-        )
-        .expect("WebSocket client with default endpoint should succeed")
+        Self::new("wss://ws-subscriptions-clob.kuest.com", Config::default())
+            .expect("WebSocket client with default endpoint should succeed")
     }
 }
 

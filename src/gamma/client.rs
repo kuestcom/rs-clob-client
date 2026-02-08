@@ -91,8 +91,7 @@ fn is_disabled_host(host: &Url) -> bool {
 
 impl Default for Client {
     fn default() -> Self {
-        Client::new(DEFAULT_HOST)
-            .expect("Client with default endpoint should succeed")
+        Client::new(DEFAULT_HOST).expect("Client with default endpoint should succeed")
     }
 }
 

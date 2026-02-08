@@ -909,10 +909,7 @@ impl<S: State> Client<S> {
     pub async fn check_geoblock(&self) -> Result<GeoblockResponse> {
         let request = self
             .client()
-            .request(
-                Method::GET,
-                format!("{}geoblock", self.inner.geoblock_host),
-            )
+            .request(Method::GET, format!("{}geoblock", self.inner.geoblock_host))
             .build()?;
 
         crate::request(&self.inner.client, request, None).await

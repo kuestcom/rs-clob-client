@@ -7,8 +7,8 @@ use url::Url;
 use super::types::{
     DepositRequest, DepositResponse, StatusRequest, StatusResponse, SupportedAssetsResponse,
 };
-use crate::error::Error;
 use crate::Result;
+use crate::error::Error;
 
 const DEFAULT_HOST: &str = "https://bridge.kuest.com/#disabled";
 const DISABLED_HOST: &str = "bridge.kuest.com";
@@ -51,8 +51,7 @@ pub struct Client {
 
 impl Default for Client {
     fn default() -> Self {
-        Client::new(DEFAULT_HOST)
-            .expect("Client with default endpoint should succeed")
+        Client::new(DEFAULT_HOST).expect("Client with default endpoint should succeed")
     }
 }
 

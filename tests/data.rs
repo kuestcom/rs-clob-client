@@ -795,9 +795,7 @@ mod builder_volume {
 
     use chrono::{DateTime, Utc};
     use httpmock::{Method::GET, MockServer};
-    use kuest_client_sdk::data::{
-        Client, types::TimePeriod, types::request::BuilderVolumeRequest,
-    };
+    use kuest_client_sdk::data::{Client, types::TimePeriod, types::request::BuilderVolumeRequest};
     use reqwest::StatusCode;
     use rust_decimal_macros::dec;
     use serde_json::json;

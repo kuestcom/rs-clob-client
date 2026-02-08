@@ -14,7 +14,9 @@ use kuest_client_sdk::error::{Kind, Synchronization, Validation};
 use reqwest::StatusCode;
 use serde_json::json;
 
-use crate::common::{API_KEY, PASSPHRASE, KUEST_ADDRESS, PRIVATE_KEY, SECRET, create_authenticated};
+use crate::common::{
+    API_KEY, KUEST_ADDRESS, PASSPHRASE, PRIVATE_KEY, SECRET, create_authenticated,
+};
 
 #[tokio::test]
 async fn authenticate_with_explicit_credentials_should_succeed() -> anyhow::Result<()> {

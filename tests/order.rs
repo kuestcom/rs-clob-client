@@ -31,7 +31,7 @@ mod lifecycle {
     use serde_json::json;
 
     use super::*;
-    use crate::common::{API_KEY, PASSPHRASE, KUEST_ADDRESS, PRIVATE_KEY, SECRET};
+    use crate::common::{API_KEY, KUEST_ADDRESS, PASSPHRASE, PRIVATE_KEY, SECRET};
 
     #[tokio::test]
     async fn order_parameters_should_reset_on_new_order() -> anyhow::Result<()> {
