@@ -76,6 +76,10 @@ const MAX_LIMIT: i32 = 500;
 /// let client = Client::new("https://custom-api.example.com").unwrap();
 /// ```
 #[derive(Clone, Debug)]
+#[expect(
+    clippy::struct_field_names,
+    reason = "Reqwest client field name is conventional"
+)]
 pub struct Client {
     host: Url,
     client: ReqwestClient,

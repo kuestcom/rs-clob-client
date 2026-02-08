@@ -43,6 +43,10 @@ fn is_disabled_host(host: &Url) -> bool {
 /// # }
 /// ```
 #[derive(Clone, Debug)]
+#[expect(
+    clippy::struct_field_names,
+    reason = "Reqwest client field name is conventional"
+)]
 pub struct Client {
     host: Url,
     client: ReqwestClient,

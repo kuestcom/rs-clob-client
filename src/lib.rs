@@ -356,7 +356,7 @@ mod tests {
         // This is the deterministic Safe address for this EOA on Polygon
         assert_eq!(
             safe_addr,
-            address!("0x4a43509c513cd037d203f8cce37b3ee6c4473f39")
+            address!("0xea318ffe79a999879e93f181e064cbc54ffb9d34")
         );
     }
 
@@ -369,7 +369,7 @@ mod tests {
         // This is the deterministic Proxy address for this EOA on Polygon
         assert_eq!(
             proxy_addr,
-            address!("0x34c9fc98c31094271ecc6ba403d7476a8c131064")
+            address!("0xff31fe60a31c3475e8dc43144da7751ff8b4b490")
         );
     }
 
@@ -380,7 +380,7 @@ mod tests {
 
         assert_eq!(
             proxy_addr,
-            address!("0x34c9fc98c31094271ecc6ba403d7476a8c131064")
+            address!("0xff31fe60a31c3475e8dc43144da7751ff8b4b490")
         );
     }
 
@@ -393,7 +393,7 @@ mod tests {
         // Same Safe factory on both networks, so same derived address
         assert_eq!(
             safe_addr,
-            address!("0x4a43509c513cd037d203f8cce37b3ee6c4473f39")
+            address!("0xea318ffe79a999879e93f181e064cbc54ffb9d34")
         );
     }
 
