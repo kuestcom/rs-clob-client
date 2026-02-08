@@ -1,0 +1,32 @@
+name: Release-plz
+
+permissions:
+  pull-requests: write
+  contents: write
+  id-token: write # Required for trusted publishing
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release-plz:
+    name: Release-plz
+    runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == 'kuestcom' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561
+        with:
+          toolchain: '1.88'
+
+      - name: Run release-plz
+        uses: MarcoIeni/release-plz-action@e592230ad39e3ec735402572601fc621aa24355c # v0.5.124
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
