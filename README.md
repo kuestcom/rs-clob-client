@@ -513,11 +513,3 @@ guideline.
 ## Contributing
 We encourage contributions from the community. Check out our [contributing guidelines](.github/CONTRIBUTING.md) for
 instructions on how to contribute to this SDK.
-
-
-## About Kuest
-[Kuest](https://docs.kuest.com/kuest-learn/get-started/what-is-kuest) is the world’s largest prediction market, allowing you to stay informed and profit from your knowledge by
-betting on future events across various topics.
-Studies show prediction markets are often more accurate than pundits because they combine news, polls, and expert
-opinions into a single value that represents the market’s view of an event’s odds. Our markets reflect accurate, unbiased,
-and real-time probabilities for the events that matter most to you. Markets seek truth.
