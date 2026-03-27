@@ -1,6 +1,7 @@
-![Kuest](assets/kuest.svg)
-
-# Kuest Rust Client
+<h1 align="center">
+  <img src="https://github.com/user-attachments/assets/0cc687fb-89c4-43fa-a056-d89c307215ad" alt="Kuest" height="96" /><br/>
+  Kuest Rust Clob Client
+</h1>
 
 [![Crates.io](https://img.shields.io/crates/v/kuest-client-sdk.svg)](https://crates.io/crates/kuest-client-sdk)
 [![CI](https://github.com/kuestcom/rs-clob-client/actions/workflows/ci.yml/badge.svg)](https://github.com/kuestcom/rs-clob-client/actions/workflows/ci.yml)
@@ -23,7 +24,6 @@ This crate provides strongly typed request builders, authenticated endpoints, `a
 - [Setting Token Allowances](#token-allowances)
 - [Minimum Supported Rust Version (MSRV)](#minimum-supported-rust-version-msrv)
 - [Contributing](#contributing)
-- [About Kuest](#about-kuest)
 
 ## Overview
 
