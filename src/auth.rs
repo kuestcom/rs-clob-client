@@ -89,8 +89,8 @@ pub mod state {
     pub struct Authenticated<K: Kind> {
         /// The signer's address that created the credentials
         pub(crate) address: Address,
-        /// The [`Credentials`]'s `secret` is used to generate an [`crate::signer::hmac`] which is
-        /// passed in the L2 headers ([`super::HeaderMap`]) `KUEST_SIGNATURE` field.
+        /// The [`Credentials`]'s `secret` is used to generate an [`crate::auth::hmac`] which is
+        /// passed in the L2 headers ([`HeaderMap`]) `KUEST_SIGNATURE` field.
         pub(crate) credentials: Credentials,
         /// The [`Kind`] that this [`Authenticated`] exhibits. Used to generate additional headers
         /// for different types of authentication, e.g. Builder.
@@ -233,7 +233,7 @@ pub(crate) mod l2 {
     pub(crate) const KUEST_SIGNATURE: &str = "KUEST_SIGNATURE";
     pub(crate) const KUEST_TIMESTAMP: &str = "KUEST_TIMESTAMP";
 
-    /// Returns the [`Headers`] needed to interact with any authenticated endpoints.
+    /// Returns the [`HeaderMap`] needed to interact with any authenticated endpoints.
     pub(crate) async fn create_headers<K: Kind>(
         state: &Authenticated<K>,
         request: &Request,
