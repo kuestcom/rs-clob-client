@@ -371,7 +371,7 @@ pub struct Config {
     /// headers. This adds another round trip to the requests.
     #[builder(default)]
     use_server_time: bool,
-    /// Override for the geoblock API host. Defaults to `https://api.kuest.com`.
+    /// Override for the geoblock API host. Defaults to `https://geoblock.kuest.com`.
     /// This is primarily useful for testing.
     #[builder(into)]
     geoblock_host: Option<String>,
@@ -382,7 +382,7 @@ pub struct Config {
 }
 
 /// The default geoblock API host (separate from CLOB host)
-const DEFAULT_GEOBLOCK_HOST: &str = "https://api.kuest.com";
+const DEFAULT_GEOBLOCK_HOST: &str = "https://geoblock.kuest.com";
 
 #[derive(Debug)]
 struct ClientInner<S: State> {
