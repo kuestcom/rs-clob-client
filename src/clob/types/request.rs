@@ -377,6 +377,12 @@ pub struct AcceptRfqQuoteRequest {
     pub salt: String,
     /// Owner identifier.
     pub owner: ApiKey,
+    /// Site fee in basis points.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fee_bps: Option<u32>,
+    /// Site fee receiver.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fee_receiver: Option<String>,
 }
 
 /// Request body for approving an RFQ order.
@@ -420,6 +426,12 @@ pub struct ApproveRfqOrderRequest {
     pub salt: String,
     /// Owner identifier.
     pub owner: ApiKey,
+    /// Site fee in basis points.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fee_bps: Option<u32>,
+    /// Site fee receiver.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fee_receiver: Option<String>,
 }
 
 #[cfg(test)]

@@ -145,6 +145,7 @@
 
 pub mod client;
 pub mod order_builder;
+pub(crate) mod site_config;
 pub mod types;
 #[cfg(feature = "ws")]
 pub mod ws;

@@ -28,6 +28,9 @@ use crate::auth::builder::{Builder, Config as BuilderConfig};
 use crate::auth::state::{Authenticated, State, Unauthenticated};
 use crate::auth::{Credentials, Kind, Normal};
 use crate::clob::order_builder::{Limit, Market, OrderBuilder, generate_seed};
+use crate::clob::site_config::{GEOBLOCK_HOST, SITE_CONFIG};
+#[cfg(feature = "rfq")]
+use crate::clob::site_config::order_fee_config;
 use crate::clob::types::request::{
     BalanceAllowanceRequest, CancelMarketOrderRequest, DeleteNotificationsRequest,
     LastTradePriceRequest, MidpointRequest, OrderBookSummaryRequest, OrdersRequest,
@@ -53,7 +56,7 @@ use crate::clob::types::{
     RfqRequestsRequest,
 };
 use crate::clob::types::{SignableOrder, SignatureType, SignedOrder, TickSize};
-use crate::error::{Error, Kind as ErrorKind, Synchronization};
+use crate::error::{Error, Geoblock, Kind as ErrorKind, Synchronization};
 use crate::types::Address;
 use crate::{
     AMOY, POLYGON, Result, Timestamp, ToQueryParams as _, auth, contract_config,
@@ -64,6 +67,7 @@ const ORDER_NAME: Option<Cow<'static, str>> = Some(Cow::Borrowed("Kuest CTF Exch
 const VERSION: Option<Cow<'static, str>> = Some(Cow::Borrowed("1"));
 
 const TERMINAL_CURSOR: &str = "LTE="; // base64("-1")
+const SITE_GEOBLOCK_CACHE_KEY: &str = "site";
 
 /// The type used to build a request to authenticate the inner [`Client<Unauthorized>`]. Calling
 /// `authenticate` on this will elevate that inner `client` into an [`Client<Authenticated<K>>`].
@@ -229,6 +233,7 @@ impl<S: Signer, K: Kind> AuthenticationBuilder<'_, S, K> {
                 tick_sizes: inner.tick_sizes,
                 neg_risk: inner.neg_risk,
                 fee_rate_bps: inner.fee_rate_bps,
+                geoblock_status: inner.geoblock_status,
                 funder,
                 signature_type: self.signature_type.unwrap_or(SignatureType::Eoa),
                 salt_generator: self.salt_generator.unwrap_or(generate_seed),
@@ -382,7 +387,7 @@ pub struct Config {
 }
 
 /// The default geoblock API host (separate from CLOB host)
-const DEFAULT_GEOBLOCK_HOST: &str = "https://geoblock.kuest.com";
+const DEFAULT_GEOBLOCK_HOST: &str = GEOBLOCK_HOST;
 
 #[derive(Debug)]
 struct ClientInner<S: State> {
@@ -401,6 +406,8 @@ struct ClientInner<S: State> {
     neg_risk: DashMap<U256, bool>,
     /// Local cache representing the fee rate in basis points per token ID
     fee_rate_bps: DashMap<U256, u32>,
+    /// Cached geoblock status for the configured site.
+    geoblock_status: DashMap<&'static str, GeoblockResponse>,
     /// The funder for this [`ClientInner`]. If funder is present, then `signature_type` cannot
     /// be [`SignatureType::Eoa`]. Conversely, if funder is absent, then `signature_type` cannot be
     /// [`SignatureType::Proxy`] or [`SignatureType::GnosisSafe`].
@@ -907,9 +914,21 @@ impl<S: State> Client<S> {
     /// }
     /// ```
     pub async fn check_geoblock(&self) -> Result<GeoblockResponse> {
+        let site_url = SITE_CONFIG.site_url.trim();
+        if site_url.is_empty() {
+            return Err(Error::validation(
+                "site_url must be configured when geoblock is enabled",
+            ));
+        }
+
+        let mut geoblock_url = self.inner.geoblock_host.clone();
+        geoblock_url.set_path("/");
+        geoblock_url.set_query(None);
+        geoblock_url.query_pairs_mut().append_pair("url", site_url);
+
         let request = self
             .client()
-            .request(Method::GET, format!("{}geoblock", self.inner.geoblock_host))
+            .request(Method::GET, geoblock_url)
             .build()?;
 
         crate::request(&self.inner.client, request, None).await
@@ -1205,6 +1224,7 @@ impl Client<Unauthenticated> {
                 tick_sizes: DashMap::new(),
                 neg_risk: DashMap::new(),
                 fee_rate_bps: DashMap::new(),
+                geoblock_status: DashMap::new(),
                 state: Unauthenticated,
                 funder: None,
                 signature_type: SignatureType::Eoa,
@@ -1292,6 +1312,34 @@ impl Client<Unauthenticated> {
 }
 
 impl<K: Kind> Client<Authenticated<K>> {
+    async fn ensure_geoblock_allowed(&self) -> Result<()> {
+        if !SITE_CONFIG.geoblock {
+            return Ok(());
+        }
+
+        let response = if let Some(cached) = self.inner.geoblock_status.get(SITE_GEOBLOCK_CACHE_KEY)
+        {
+            cached.value().clone()
+        } else {
+            let response = self.check_geoblock().await?;
+            self.inner
+                .geoblock_status
+                .insert(SITE_GEOBLOCK_CACHE_KEY, response.clone());
+            response
+        };
+
+        if response.blocked {
+            return Err(Geoblock {
+                ip: response.ip,
+                country: response.country,
+                region: response.region,
+            }
+            .into());
+        }
+
+        Ok(())
+    }
+
     /// Demotes this authenticated [`Client<Authenticated<K>>`] to an unauthenticated one
     #[cfg_attr(
         not(feature = "heartbeats"),
@@ -1317,6 +1365,7 @@ impl<K: Kind> Client<Authenticated<K>> {
                 tick_sizes: inner.tick_sizes,
                 neg_risk: inner.neg_risk,
                 fee_rate_bps: inner.fee_rate_bps,
+                geoblock_status: inner.geoblock_status,
                 // Reset the order parameters that were previously stored on the client
                 funder: None,
                 signature_type: SignatureType::Eoa,
@@ -1478,6 +1527,7 @@ impl<K: Kind> Client<Authenticated<K>> {
     /// - The order price/size violates market rules
     /// - The request fails
     pub async fn post_order(&self, order: SignedOrder) -> Result<PostOrderResponse> {
+        self.ensure_geoblock_allowed().await?;
         let request = self
             .client()
             .request(Method::POST, format!("{}order", self.host()))
@@ -1498,6 +1548,7 @@ impl<K: Kind> Client<Authenticated<K>> {
     ///
     /// Returns an error if any order fails validation or the request fails.
     pub async fn post_orders(&self, orders: Vec<SignedOrder>) -> Result<Vec<PostOrderResponse>> {
+        self.ensure_geoblock_allowed().await?;
         let request = self
             .client()
             .request(Method::POST, format!("{}orders", self.host()))
@@ -2147,6 +2198,12 @@ impl Client<Authenticated<Normal>> {
         mut self,
         config: BuilderConfig,
     ) -> Result<Client<Authenticated<Builder>>> {
+        if !SITE_CONFIG.builder_mode {
+            return Err(Error::validation(
+                "builder_mode is disabled in src/clob/site_config.rs",
+            ));
+        }
+
         #[cfg(feature = "heartbeats")]
         self.heartbeat_token.cancel_and_wait().await?;
 
@@ -2170,6 +2227,7 @@ impl Client<Authenticated<Normal>> {
             tick_sizes: inner.tick_sizes,
             neg_risk: inner.neg_risk,
             fee_rate_bps: inner.fee_rate_bps,
+            geoblock_status: inner.geoblock_status,
             funder: inner.funder,
             signature_type: inner.signature_type,
             salt_generator: inner.salt_generator,
@@ -2258,6 +2316,7 @@ impl<K: Kind> Client<Authenticated<K>> {
         &self,
         request: &CreateRfqRequestRequest,
     ) -> Result<CreateRfqRequestResponse> {
+        self.ensure_geoblock_allowed().await?;
         let http_request = self
             .client()
             .request(Method::POST, format!("{}rfq/request", self.host()))
@@ -2321,6 +2380,7 @@ impl<K: Kind> Client<Authenticated<K>> {
         &self,
         request: &CreateRfqQuoteRequest,
     ) -> Result<CreateRfqQuoteResponse> {
+        self.ensure_geoblock_allowed().await?;
         let http_request = self
             .client()
             .request(Method::POST, format!("{}rfq/quote", self.host()))
@@ -2385,10 +2445,18 @@ impl<K: Kind> Client<Authenticated<K>> {
         &self,
         request: &AcceptRfqQuoteRequest,
     ) -> Result<AcceptRfqQuoteResponse> {
+        self.ensure_geoblock_allowed().await?;
+        let mut request = request.clone();
+        if request.fee_receiver.is_none() {
+            if let Some((fee_bps, fee_receiver)) = order_fee_config() {
+                request.fee_bps = Some(fee_bps);
+                request.fee_receiver = Some(fee_receiver.to_owned());
+            }
+        }
         let http_request = self
             .client()
             .request(Method::POST, format!("{}rfq/request/accept", self.host()))
-            .json(request)
+            .json(&request)
             .build()?;
         let headers = self.create_headers(&http_request).await?;
 
@@ -2407,10 +2475,18 @@ impl<K: Kind> Client<Authenticated<K>> {
         &self,
         request: &ApproveRfqOrderRequest,
     ) -> Result<ApproveRfqOrderResponse> {
+        self.ensure_geoblock_allowed().await?;
+        let mut request = request.clone();
+        if request.fee_receiver.is_none() {
+            if let Some((fee_bps, fee_receiver)) = order_fee_config() {
+                request.fee_bps = Some(fee_bps);
+                request.fee_receiver = Some(fee_receiver.to_owned());
+            }
+        }
         let http_request = self
             .client()
             .request(Method::POST, format!("{}rfq/quote/approve", self.host()))
-            .json(request)
+            .json(&request)
             .build()?;
         let headers = self.create_headers(&http_request).await?;
 

@@ -12,6 +12,7 @@ use strum_macros::Display;
 
 use crate::Result;
 use crate::auth::ApiKey;
+use crate::clob::site_config::order_fee_config;
 use crate::clob::order_builder::{LOT_SIZE_SCALE, USDC_DECIMALS};
 use crate::error::Error;
 use crate::types::Decimal;
@@ -520,7 +521,7 @@ struct OrderWithSignature<'order> {
 // CLOB expects a struct that has the `signature` "folded" into the `order` key
 impl Serialize for SignedOrder {
     fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
-        let len = if self.post_only.is_some() { 4 } else { 3 };
+        let len = 3 + usize::from(self.post_only.is_some()) + order_fee_config().map_or(0, |_| 2);
         let mut st = serializer.serialize_struct("SignedOrder", len)?;
 
         // Convert numeric side to Side enum for string serialization
@@ -546,6 +547,10 @@ impl Serialize for SignedOrder {
         st.serialize_field("order", &order_with_sig)?;
         st.serialize_field("orderType", &self.order_type)?;
         st.serialize_field("owner", &self.owner)?;
+        if let Some((fee_bps, fee_receiver)) = order_fee_config() {
+            st.serialize_field("fee_bps", &fee_bps)?;
+            st.serialize_field("fee_receiver", &fee_receiver)?;
+        }
         if let Some(post_only) = self.post_only {
             st.serialize_field("postOnly", &post_only)?;
         }
