@@ -6,12 +6,12 @@ Rust SDK for the Kuest CLOB.
 
 ```toml
 [dependencies]
-kuest-client-sdk = "0.1"
+kuest-client-sdk = "0.5.1"
 ```
 
 ## Read-Only Client
 
-```rust
+```rust,ignore
 use kuest_client_sdk::clob::{Client, Config};
 
 # async fn run() -> kuest_client_sdk::Result<()> {
@@ -26,7 +26,7 @@ println!("{ok}");
 
 Kuest trading uses Deposit Wallet orders only. Public order builders use `SignatureType::DepositWallet` (`3`) and require a Deposit Wallet funder address.
 
-```rust
+```rust,ignore
 use std::str::FromStr;
 
 use alloy::signers::Signer as _;

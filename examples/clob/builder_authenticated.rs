@@ -86,7 +86,7 @@ async fn main() -> anyhow::Result<()> {
             info!(endpoint = "builder_trades", builder_code = %builder_code, token_id = %token_id, count = trades.data.len());
         }
         Err(e) => {
-            error!(endpoint = "builder_trades", builder_code = %builder_code, token_id = %token_id, error = %e)
+            error!(endpoint = "builder_trades", builder_code = %builder_code, token_id = %token_id, error = %e);
         }
     }
 

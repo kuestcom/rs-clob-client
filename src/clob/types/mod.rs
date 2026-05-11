@@ -662,6 +662,12 @@ pub enum OrderSignature {
 }
 
 impl OrderSignature {
+    /// Returns the ECDSA `r` component.
+    ///
+    /// # Panics
+    ///
+    /// Panics when called on a wrapped Deposit Wallet signature because it does not expose ECDSA
+    /// components.
     #[must_use]
     pub fn r(&self) -> U256 {
         match self {
@@ -672,6 +678,12 @@ impl OrderSignature {
         }
     }
 
+    /// Returns the ECDSA `s` component.
+    ///
+    /// # Panics
+    ///
+    /// Panics when called on a wrapped Deposit Wallet signature because it does not expose ECDSA
+    /// components.
     #[must_use]
     pub fn s(&self) -> U256 {
         match self {

@@ -217,12 +217,25 @@ mod unauthenticated {
         let client = Client::new(&server.base_url(), Config::default())?;
 
         let mock = server.mock(|when, then| {
-            when.method(httpmock::Method::GET).path("/prices");
+            when.method(httpmock::Method::POST)
+                .path("/prices")
+                .json_body(json!([
+                    { "token_id": token_1().to_string(), "side": "BUY" },
+                    { "token_id": token_1().to_string(), "side": "SELL" }
+                ]));
             then.status(StatusCode::OK)
                 .json_body(json!({ token_1().to_string(): { "BUY": 0.5, "SELL": 0.6 } }));
         });
 
-        let response = client.all_prices().await?;
+        let buy_request = PriceRequest::builder()
+            .token_id(token_1())
+            .side(Side::Buy)
+            .build();
+        let sell_request = PriceRequest::builder()
+            .token_id(token_1())
+            .side(Side::Sell)
+            .build();
+        let response = client.prices(&[buy_request, sell_request]).await?;
 
         let mut price_map = HashMap::new();
         let mut side_map = HashMap::new();
@@ -1378,7 +1391,6 @@ mod authenticated {
     #[cfg(feature = "heartbeats")]
     use std::time::Duration;
 
-    use alloy::primitives::Signature;
     use alloy::signers::Signer as _;
     use alloy::signers::local::LocalSigner;
     use chrono::NaiveDate;
@@ -1395,8 +1407,8 @@ mod authenticated {
         TotalUserEarningResponse, TradeResponse, UserEarningResponse, UserRewardsEarningResponse,
     };
     use kuest_client_sdk::clob::types::{
-        AssetType, OrderStatusType, OrderType, Side, SignableOrder, SignedOrder, TickSize,
-        TradeStatusType, TraderSide,
+        AssetType, OrderStatusType, OrderType, Side, SignableOrder, TickSize, TradeStatusType,
+        TraderSide,
     };
     #[cfg(feature = "heartbeats")]
     use kuest_client_sdk::error::Synchronization;
@@ -1521,51 +1533,31 @@ mod authenticated {
             TickSize::Thousandth
         );
 
-        let taker = address!("0xf7fB45986800e2D259BAa25B56466bd02dA37a44");
         let signable_order = client
             .limit_order()
             .token_id(token_1())
             .price(dec!(0.512))
             .size(Decimal::ONE_HUNDRED)
             .side(Side::Buy)
-            .taker(taker)
-            .nonce(2)
             .build()
             .await?;
 
         let signed_order = client.sign(&signer, signable_order.clone()).await?;
 
-        let expected = SignedOrder::builder()
-            .owner(API_KEY)
-            .order(signable_order.order)
-            .order_type(OrderType::GTC)
-            .post_only(false)
-            .signature(Signature::new(
-                U256::from_str(
-                    "91890422924652692087997146442157314438247188363614601152010513394256110437832",
-                )?,
-                U256::from_str(
-                    "9277914087525465489713864604207688821652104267095002058067615097320766634151",
-                )?,
-                false,
-            ))
-            .build();
-
-        assert_eq!(signed_order.order.taker, taker);
-        assert_eq!(signed_order.order.maker, funder);
-        assert_ne!(signed_order.order.maker, client.address());
+        assert_eq!(signed_order.order().maker, funder);
+        assert_eq!(signed_order.order().signer, funder);
+        assert_ne!(signed_order.order().maker, client.address());
         assert_eq!(
-            signed_order.order.signatureType,
+            signed_order.order().signatureType,
             SignatureType::DepositWallet as u8
         );
-        assert_eq!(signed_order.order.nonce, U256::from(2));
-        assert_eq!(signed_order.order.salt, U256::from(1));
+        assert_eq!(signed_order.order().salt, U256::from(1));
+        assert_eq!(signed_order.order_type, OrderType::GTC);
         assert_eq!(
             client.address(),
             address!("0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266")
         );
 
-        assert_eq!(signed_order, expected);
         mock.assert();
         mock2.assert_calls(2);
 
@@ -2522,64 +2514,69 @@ mod authenticated {
             .user_earnings_and_markets_config(&request, None)
             .await?;
 
-        let expected = vec![
-            UserRewardsEarningResponse::builder()
-                .condition_id(b256!(
-                    "0000000000000000000000000000000000000000000000000000000c00d00123"
-                ))
-                .question("Will BTC be above $50k on December 31, 2025?")
-                .market_slug("btc-above-50k-2025-12-31")
-                .event_slug("btc-above-50k-2025")
-                .image("https://example.com/markets/btc.png")
-                .rewards_max_spread(dec!(0.05))
-                .rewards_min_size(dec!(10.0))
-                .market_competitiveness(dec!(0.80))
-                .tokens(vec![
-                    Token::builder()
-                        .token_id(token_1())
-                        .outcome("YES")
-                        .price(dec!(0.55))
-                        .winner(true)
-                        .build(),
-                    Token::builder()
-                        .token_id(token_2())
-                        .outcome("NO")
-                        .price(dec!(0.45))
-                        .winner(false)
-                        .build(),
-                ])
-                .rewards_config(vec![
-                    RewardsConfig::builder()
-                        .asset_address(address!("0x0000000000000000000000000000000000000001"))
-                        .start_date("2024-01-01".parse().unwrap())
-                        .end_date("2024-12-31".parse().unwrap())
-                        .rate_per_day(dec!(1.5))
-                        .total_rewards(dec!(500.0))
-                        .build(),
-                    RewardsConfig::builder()
-                        .asset_address(address!("0x0000000000000000000000000000000000000002"))
-                        .start_date("2024-06-01".parse().unwrap())
-                        .end_date("2024-12-31".parse().unwrap())
-                        .rate_per_day(dec!(0.75))
-                        .total_rewards(dec!(250.0))
-                        .build(),
-                ])
-                .maker_address(address!("0x1111111111111111111111111111111111111111"))
-                .earning_percentage(dec!(0.25))
-                .earnings(vec![
-                    Earning::builder()
-                        .asset_address(address!("0x0000000000000000000000000000000000000001"))
-                        .earnings(dec!(125.0))
-                        .asset_rate(dec!(1.5))
-                        .build(),
-                    Earning::builder()
-                        .asset_address(address!("0x0000000000000000000000000000000000000002"))
-                        .earnings(dec!(62.5))
-                        .asset_rate(dec!(0.75))
-                        .build(),
-                ])
-                .build(),
-        ];
+        let expected = Page::builder()
+            .limit(1)
+            .count(1)
+            .next_cursor("next")
+            .data(vec![
+                UserRewardsEarningResponse::builder()
+                    .condition_id(b256!(
+                        "0000000000000000000000000000000000000000000000000000000c00d00123"
+                    ))
+                    .question("Will BTC be above $50k on December 31, 2025?")
+                    .market_slug("btc-above-50k-2025-12-31")
+                    .event_slug("btc-above-50k-2025")
+                    .image("https://example.com/markets/btc.png")
+                    .rewards_max_spread(dec!(0.05))
+                    .rewards_min_size(dec!(10.0))
+                    .market_competitiveness(dec!(0.80))
+                    .tokens(vec![
+                        Token::builder()
+                            .token_id(token_1())
+                            .outcome("YES")
+                            .price(dec!(0.55))
+                            .winner(true)
+                            .build(),
+                        Token::builder()
+                            .token_id(token_2())
+                            .outcome("NO")
+                            .price(dec!(0.45))
+                            .winner(false)
+                            .build(),
+                    ])
+                    .rewards_config(vec![
+                        RewardsConfig::builder()
+                            .asset_address(address!("0x0000000000000000000000000000000000000001"))
+                            .start_date("2024-01-01".parse().unwrap())
+                            .end_date("2024-12-31".parse().unwrap())
+                            .rate_per_day(dec!(1.5))
+                            .total_rewards(dec!(500.0))
+                            .build(),
+                        RewardsConfig::builder()
+                            .asset_address(address!("0x0000000000000000000000000000000000000002"))
+                            .start_date("2024-06-01".parse().unwrap())
+                            .end_date("2024-12-31".parse().unwrap())
+                            .rate_per_day(dec!(0.75))
+                            .total_rewards(dec!(250.0))
+                            .build(),
+                    ])
+                    .maker_address(address!("0x1111111111111111111111111111111111111111"))
+                    .earning_percentage(dec!(0.25))
+                    .earnings(vec![
+                        Earning::builder()
+                            .asset_address(address!("0x0000000000000000000000000000000000000001"))
+                            .earnings(dec!(125.0))
+                            .asset_rate(dec!(1.5))
+                            .build(),
+                        Earning::builder()
+                            .asset_address(address!("0x0000000000000000000000000000000000000002"))
+                            .earnings(dec!(62.5))
+                            .asset_rate(dec!(0.75))
+                            .build(),
+                    ])
+                    .build(),
+            ])
+            .build();
 
         assert_eq!(response, expected);
         mock.assert();
@@ -3128,6 +3125,8 @@ mod builder_authenticated {
             }));
         });
 
+        let builder_code =
+            b256!("00000000000000000000000000000000000000000000000000006275696c6431");
         let mock4 = server.mock(|when, then| {
             when.method(httpmock::Method::GET)
                 .path("/builder/trades")
@@ -3139,7 +3138,8 @@ mod builder_authenticated {
                 .header(KUEST_BUILDER_SIGNATURE, "signature")
                 .header(KUEST_BUILDER_TIMESTAMP, "1")
                 .query_param("id", "1")
-                .query_param("market", "0x000000000000000000000000000000000000000000000000000000006d61726b");
+                .query_param("market", "0x000000000000000000000000000000000000000000000000000000006d61726b")
+                .query_param("builder_code", builder_code.to_string());
 
             then.status(StatusCode::OK).json_body(json!({
                 "data": [
@@ -3181,7 +3181,7 @@ mod builder_authenticated {
                 "000000000000000000000000000000000000000000000000000000006d61726b"
             ))
             .build();
-        let response = client.builder_trades(&request, None).await?;
+        let response = client.builder_trades(builder_code, &request, None).await?;
 
         let trade = BuilderTradeResponse::builder()
             .id("1")

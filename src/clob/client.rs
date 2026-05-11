@@ -524,7 +524,7 @@ impl<S: State> Client<S> {
         &self.inner.host
     }
 
-    /// Invalidates all internal caches (tick sizes, neg risk flags, and fee rates).
+    /// Invalidates all internal caches (tick sizes, neg risk flags, fee rates, and version data).
     ///
     /// This method clears the cached market configuration data, forcing subsequent
     /// requests to fetch fresh data from the API. Use this when you suspect
@@ -532,8 +532,11 @@ impl<S: State> Client<S> {
     pub fn invalidate_internal_caches(&self) {
         self.inner.tick_sizes.clear();
         self.inner.fee_rate_bps.clear();
+        self.inner.fee_infos.clear();
         self.inner.neg_risk.clear();
+        self.inner.token_condition_map.clear();
         self.inner.builder_fee_rates.clear();
+        self.inner.cached_version.store(0, Ordering::Relaxed);
     }
 
     /// Pre-populates the tick size cache for a token, avoiding the HTTP call.
@@ -1548,6 +1551,59 @@ impl<K: Kind> Client<Authenticated<K>> {
                 funder: None,
                 signature_type: SignatureType::DepositWallet,
                 salt_generator: generate_seed,
+            }),
+            #[cfg(feature = "heartbeats")]
+            heartbeat_token: DroppingCancellationToken(None),
+        })
+    }
+
+    /// Promotes this authenticated client to include Builder auth headers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the client has outstanding clones and cannot be safely transformed.
+    #[cfg_attr(
+        not(feature = "heartbeats"),
+        expect(
+            clippy::unused_async,
+            unused_mut,
+            reason = "Nothing to await or modify when heartbeats are disabled"
+        )
+    )]
+    pub async fn promote_to_builder(
+        mut self,
+        config: auth::builder::Config,
+    ) -> Result<Client<Authenticated<auth::builder::Builder>>> {
+        #[cfg(feature = "heartbeats")]
+        self.heartbeat_token.cancel_and_wait().await?;
+
+        let inner = Arc::into_inner(self.inner).ok_or(Synchronization)?;
+        let state = Authenticated {
+            address: inner.state.address,
+            credentials: inner.state.credentials,
+            kind: auth::builder::Builder {
+                config,
+                client: ReqwestClient::new(),
+            },
+        };
+
+        Ok(Client::<Authenticated<auth::builder::Builder>> {
+            inner: Arc::new(ClientInner {
+                state,
+                host: inner.host,
+                geoblock_host: inner.geoblock_host,
+                config: inner.config,
+                client: inner.client,
+                tick_sizes: inner.tick_sizes,
+                neg_risk: inner.neg_risk,
+                fee_rate_bps: inner.fee_rate_bps,
+                fee_infos: inner.fee_infos,
+                token_condition_map: inner.token_condition_map,
+                builder_fee_rates: inner.builder_fee_rates,
+                cached_version: inner.cached_version,
+                funder: inner.funder,
+                signature_type: inner.signature_type,
+                salt_generator: inner.salt_generator,
             }),
             #[cfg(feature = "heartbeats")]
             heartbeat_token: DroppingCancellationToken(None),
