@@ -15,7 +15,7 @@
 //! LOG_FILE=aws_authenticated.log RUST_LOG=info,hyper_util=off,hyper=off,reqwest=off,h2=off,rustls=off cargo run --example aws_authenticated --features clob,tracing
 //! ```
 //!
-//! Requires AWS credentials configured and a valid KMS key ID.
+//! Requires AWS credentials configured, a valid KMS key ID, and `KUEST_DEPOSIT_WALLET`.
 
 use std::fs::File;
 
@@ -54,9 +54,13 @@ async fn main() -> anyhow::Result<()> {
     let alloy_signer = AwsSigner::new(kms_client, key_id, Some(POLYGON))
         .await?
         .with_chain_id(Some(POLYGON));
+    let funder = std::env::var("KUEST_DEPOSIT_WALLET")
+        .expect("Need KUEST_DEPOSIT_WALLET")
+        .parse()?;
 
     let client = Client::new("https://clob.kuest.com", Config::default())?
         .authentication_builder(&alloy_signer)
+        .funder(funder)
         .authenticate()
         .await?;
 

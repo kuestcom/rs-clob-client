@@ -31,7 +31,7 @@ mod lifecycle {
     use serde_json::json;
 
     use super::*;
-    use crate::common::{API_KEY, KUEST_ADDRESS, PASSPHRASE, PRIVATE_KEY, SECRET};
+    use crate::common::{API_KEY, DEFAULT_FUNDER, KUEST_ADDRESS, PASSPHRASE, PRIVATE_KEY, SECRET};
 
     #[tokio::test]
     async fn order_parameters_should_reset_on_new_order() -> anyhow::Result<()> {
@@ -46,7 +46,6 @@ mod lifecycle {
             .token_id(token_1())
             .size(Decimal::ONE_HUNDRED)
             .price(dec!(0.1))
-            .nonce(1)
             .side(Side::Buy)
             .build()
             .await?;
@@ -60,8 +59,8 @@ mod lifecycle {
             .build()
             .await?;
 
-        assert_eq!(signable_order.order.nonce, U256::from(1));
-        assert_eq!(signable_order_2.order.nonce, U256::ZERO);
+        assert_eq!(signable_order.order().nonce, U256::from(1));
+        assert_eq!(signable_order_2.order().nonce, U256::ZERO);
         assert_ne!(signable_order, signable_order_2);
 
         Ok(())
@@ -86,6 +85,7 @@ mod lifecycle {
         let client = Client::new(&server.base_url(), Config::default())?
             .authentication_builder(&signer)
             .salt_generator(|| 1)
+            .funder(DEFAULT_FUNDER)
             .authenticate()
             .await?;
 
@@ -97,7 +97,6 @@ mod lifecycle {
             .token_id(token_1())
             .size(Decimal::ONE_HUNDRED)
             .price(dec!(0.1))
-            .nonce(1)
             .side(Side::Buy)
             .build()
             .await?;
@@ -111,8 +110,8 @@ mod lifecycle {
             .build()
             .await?;
 
-        assert_eq!(signable_order.order.salt, U256::from(1));
-        assert_eq!(signable_order_2.order.salt, U256::from(1));
+        assert_eq!(signable_order.order().salt, U256::from(1));
+        assert_eq!(signable_order_2.order().salt, U256::from(1));
         assert_ne!(signable_order, signable_order_2);
         mock.assert();
 
@@ -139,7 +138,7 @@ mod lifecycle {
             .authentication_builder(&signer)
             .salt_generator(|| 1)
             .funder(address!("0xd1615A7B6146cDbA40a559eC876A3bcca4050890"))
-            .signature_type(SignatureType::GnosisSafe)
+            .signature_type(SignatureType::DepositWallet)
             .authenticate()
             .await?;
 
@@ -150,15 +149,14 @@ mod lifecycle {
             .token_id(token_1())
             .size(Decimal::ONE_HUNDRED)
             .price(dec!(0.1))
-            .nonce(1)
             .side(Side::Buy)
             .build()
             .await?;
 
-        assert_eq!(signable_order.order.salt, U256::from(1));
+        assert_eq!(signable_order.order().salt, U256::from(1));
         assert_eq!(
-            signable_order.order.signatureType,
-            SignatureType::GnosisSafe as u8
+            signable_order.order().signatureType,
+            SignatureType::DepositWallet as u8
         );
 
         let client = client
@@ -166,6 +164,7 @@ mod lifecycle {
             .await?
             .authentication_builder(&signer)
             .salt_generator(|| 123)
+            .funder(DEFAULT_FUNDER)
             .authenticate()
             .await?;
 
@@ -174,14 +173,17 @@ mod lifecycle {
             .token_id(token_1())
             .size(Decimal::ONE_HUNDRED)
             .price(dec!(0.1))
-            .nonce(1)
             .side(Side::Buy)
             .build()
             .await?;
 
-        assert_eq!(signable_order.order.salt, U256::from(123));
-        assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
-        assert_eq!(signable_order.order.maker, signer.address());
+        assert_eq!(signable_order.order().salt, U256::from(123));
+        assert_eq!(
+            signable_order.order().signatureType,
+            SignatureType::DepositWallet as u8
+        );
+        assert_eq!(signable_order.order().maker, DEFAULT_FUNDER);
+        assert_eq!(signable_order.order().signer, DEFAULT_FUNDER);
 
         mock.assert_calls(2);
 
@@ -208,7 +210,7 @@ mod lifecycle {
         let client = Client::new(&server.base_url(), Config::default())?
             .authentication_builder(&signer)
             .funder(funder)
-            .signature_type(SignatureType::Proxy)
+            .signature_type(SignatureType::DepositWallet)
             .authenticate()
             .await?;
 
@@ -221,19 +223,18 @@ mod lifecycle {
             .token_id(token_1())
             .size(Decimal::ONE_HUNDRED)
             .price(dec!(0.1))
-            .nonce(1)
             .side(Side::Buy)
             .build()
             .await?;
 
-        assert_eq!(signable_order.order.maker, funder);
+        assert_eq!(signable_order.order().maker, funder);
         assert_eq!(
-            signable_order.order.signatureType,
-            SignatureType::Proxy as u8
+            signable_order.order().signatureType,
+            SignatureType::DepositWallet as u8
         );
-        assert_eq!(signable_order.order.nonce, U256::from(1));
-        assert_eq!(signable_order.order.side, Side::Buy as u8);
-        assert_ne!(signable_order.order.maker, signable_order.order.signer);
+        assert_eq!(signable_order.order().nonce, U256::from(1));
+        assert_eq!(signable_order.order().side, Side::Buy as u8);
+        assert_eq!(signable_order.order().signer, funder);
 
         ensure_requirements(&server, token_2(), TickSize::Tenth);
 
@@ -242,20 +243,19 @@ mod lifecycle {
             .token_id(token_2())
             .size(Decimal::TEN)
             .price(dec!(0.2))
-            .nonce(2)
             .side(Side::Sell)
             .build()
             .await?;
 
         // Funder and signature type propagate from setting on the auth builder
-        assert_eq!(signable_order.order.maker, funder);
+        assert_eq!(signable_order.order().maker, funder);
         assert_eq!(
-            signable_order.order.signatureType,
-            SignatureType::Proxy as u8
+            signable_order.order().signatureType,
+            SignatureType::DepositWallet as u8
         );
-        assert_eq!(signable_order.order.nonce, U256::from(2));
-        assert_eq!(signable_order.order.side, Side::Sell as u8);
-        assert_ne!(signable_order.order.maker, signable_order.order.signer);
+        assert_eq!(signable_order.order().nonce, U256::from(2));
+        assert_eq!(signable_order.order().side, Side::Sell as u8);
+        assert_eq!(signable_order.order().signer, funder);
 
         Ok(())
     }
@@ -281,7 +281,7 @@ mod lifecycle {
         let client = Client::new(&server.base_url(), Config::default())?
             .authentication_builder(&signer)
             .funder(funder)
-            .signature_type(SignatureType::Proxy)
+            .signature_type(SignatureType::DepositWallet)
             .authenticate()
             .await?;
 
@@ -294,25 +294,25 @@ mod lifecycle {
             .token_id(token_1())
             .size(Decimal::ONE_HUNDRED)
             .price(dec!(0.1))
-            .nonce(1)
             .side(Side::Buy)
             .build()
             .await?;
 
-        assert_eq!(signable_order.order.maker, funder);
+        assert_eq!(signable_order.order().maker, funder);
         assert_eq!(
-            signable_order.order.signatureType,
-            SignatureType::Proxy as u8
+            signable_order.order().signatureType,
+            SignatureType::DepositWallet as u8
         );
-        assert_eq!(signable_order.order.nonce, U256::from(1));
-        assert_eq!(signable_order.order.side, Side::Buy as u8);
-        assert_ne!(signable_order.order.maker, signable_order.order.signer);
+        assert_eq!(signable_order.order().nonce, U256::from(1));
+        assert_eq!(signable_order.order().side, Side::Buy as u8);
+        assert_ne!(signable_order.order().maker, signable_order.order().signer);
 
         ensure_requirements(&server, token_2(), TickSize::Tenth);
 
         client.deauthenticate().await?;
         let client = Client::new(&server.base_url(), Config::default())?
             .authentication_builder(&signer)
+            .funder(DEFAULT_FUNDER)
             .authenticate()
             .await?;
 
@@ -321,32 +321,31 @@ mod lifecycle {
             .token_id(token_2())
             .size(Decimal::TEN)
             .price(dec!(0.2))
-            .nonce(2)
             .side(Side::Sell)
             .build()
             .await?;
 
-        // Funder and signature type propagate from setting on the auth builder
-        assert_eq!(signable_order.order.maker, signer.address());
-        assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
-        assert_eq!(signable_order.order.nonce, U256::from(2));
-        assert_eq!(signable_order.order.side, Side::Sell as u8);
-        assert_eq!(signable_order.order.maker, signable_order.order.signer);
+        // Deposit Wallet funder and signature type propagate from the auth builder.
+        assert_eq!(signable_order.order().maker, DEFAULT_FUNDER);
+        assert_eq!(
+            signable_order.order().signatureType,
+            SignatureType::DepositWallet as u8
+        );
+        assert_eq!(signable_order.order().nonce, U256::from(2));
+        assert_eq!(signable_order.order().side, Side::Sell as u8);
+        assert_eq!(signable_order.order().signer, DEFAULT_FUNDER);
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn incompatible_funder_and_signature_types_should_fail() -> anyhow::Result<()> {
+    async fn missing_or_zero_funder_should_fail() -> anyhow::Result<()> {
         let server = MockServer::start();
 
         let signer = LocalSigner::from_str(PRIVATE_KEY)?.with_chain_id(Some(POLYGON));
 
-        let funder = address!("0xaDEFf2158d668f64308C62ef227C5CcaCAAf976D");
         let err = Client::new(&server.base_url(), Config::default())?
             .authentication_builder(&signer)
-            .funder(funder)
-            .signature_type(SignatureType::Eoa)
             .authenticate()
             .await
             .unwrap_err();
@@ -354,16 +353,13 @@ mod lifecycle {
 
         assert_eq!(
             msg,
-            "Cannot have a funder address with a Eoa signature type"
+            "Deposit Wallet funder address is required for Kuest orders"
         );
-
-        // Note: Using GnosisSafe without explicit funder now auto-derives from signer.address()
-        // So this case now succeeds - tested in funder_auto_derived_from_signer_for_proxy_types
 
         let err = Client::new(&server.base_url(), Config::default())?
             .authentication_builder(&signer)
             .funder(Address::ZERO)
-            .signature_type(SignatureType::GnosisSafe)
+            .signature_type(SignatureType::DepositWallet)
             .authenticate()
             .await
             .unwrap_err();
@@ -371,114 +367,15 @@ mod lifecycle {
 
         assert_eq!(
             msg,
-            "Cannot have a zero funder address with a GnosisSafe signature type"
+            "Deposit Wallet funder address cannot be the zero address"
         );
 
         Ok(())
     }
 
-    /// Tests that the funder address is automatically derived using CREATE2 from
-    /// the signer's EOA when using Proxy or `GnosisSafe` signature types without
-    /// explicit funder.
+    /// Tests that explicit Deposit Wallet funder address is used for signed orders.
     #[tokio::test]
-    async fn funder_auto_derived_from_signer_for_proxy_types() -> anyhow::Result<()> {
-        use kuest_client_sdk::{POLYGON, derive_proxy_wallet, derive_safe_wallet};
-
-        let server = MockServer::start();
-        let signer = LocalSigner::from_str(PRIVATE_KEY)?.with_chain_id(Some(POLYGON));
-
-        // Expected CREATE2-derived addresses for this signer
-        let expected_safe_addr =
-            derive_safe_wallet(signer.address(), POLYGON).expect("Safe derivation failed");
-        let expected_proxy_addr =
-            derive_proxy_wallet(signer.address(), POLYGON).expect("Proxy derivation failed");
-
-        server.mock(|when, then| {
-            when.method(httpmock::Method::GET)
-                .path("/auth/derive-api-key")
-                .header(KUEST_ADDRESS, signer.address().to_string().to_lowercase());
-            then.status(StatusCode::OK).json_body(json!({
-                "apiKey": API_KEY.to_string(),
-                "passphrase": PASSPHRASE,
-                "secret": SECRET
-            }));
-        });
-
-        // GnosisSafe without explicit funder - should auto-derive using CREATE2
-        let client = Client::new(&server.base_url(), Config::default())?
-            .authentication_builder(&signer)
-            .signature_type(SignatureType::GnosisSafe)
-            .authenticate()
-            .await?;
-
-        ensure_requirements(&server, token_1(), TickSize::Tenth);
-
-        let signable_order = client
-            .limit_order()
-            .token_id(token_1())
-            .size(Decimal::ONE_HUNDRED)
-            .price(dec!(0.5))
-            .side(Side::Buy)
-            .build()
-            .await?;
-
-        // Verify maker (funder) is the CREATE2-derived Safe address
-        assert_eq!(signable_order.order.maker, expected_safe_addr);
-        // Signer remains the EOA
-        assert_eq!(signable_order.order.signer, signer.address());
-        // Maker and signer should be different for proxy types
-        assert_ne!(signable_order.order.maker, signable_order.order.signer);
-        assert_eq!(
-            signable_order.order.signatureType,
-            SignatureType::GnosisSafe as u8
-        );
-
-        // Now test with SignatureType::Proxy
-        server.mock(|when, then| {
-            when.method(httpmock::Method::GET)
-                .path("/auth/derive-api-key")
-                .header(KUEST_ADDRESS, signer.address().to_string().to_lowercase());
-            then.status(StatusCode::OK).json_body(json!({
-                "apiKey": API_KEY.to_string(),
-                "passphrase": PASSPHRASE,
-                "secret": SECRET
-            }));
-        });
-
-        let client = Client::new(&server.base_url(), Config::default())?
-            .authentication_builder(&signer)
-            .signature_type(SignatureType::Proxy)
-            .authenticate()
-            .await?;
-
-        ensure_requirements(&server, token_1(), TickSize::Tenth);
-
-        let signable_order = client
-            .limit_order()
-            .token_id(token_1())
-            .size(Decimal::ONE_HUNDRED)
-            .price(dec!(0.5))
-            .side(Side::Buy)
-            .build()
-            .await?;
-
-        // Verify maker (funder) is the CREATE2-derived Proxy address
-        assert_eq!(signable_order.order.maker, expected_proxy_addr);
-        // Signer remains the EOA
-        assert_eq!(signable_order.order.signer, signer.address());
-        // Maker and signer should be different for proxy types
-        assert_ne!(signable_order.order.maker, signable_order.order.signer);
-        assert_eq!(
-            signable_order.order.signatureType,
-            SignatureType::Proxy as u8
-        );
-
-        Ok(())
-    }
-
-    /// Tests that explicit funder address overrides the auto-derivation.
-    #[tokio::test]
-    async fn explicit_funder_overrides_auto_derivation() -> anyhow::Result<()> {
+    async fn explicit_funder_is_used_for_deposit_wallet_order() -> anyhow::Result<()> {
         let server = MockServer::start();
         let signer = LocalSigner::from_str(PRIVATE_KEY)?.with_chain_id(Some(POLYGON));
         let explicit_funder = address!("0xaDEFf2158d668f64308C62ef227C5CcaCAAf976D");
@@ -494,11 +391,10 @@ mod lifecycle {
             }));
         });
 
-        // GnosisSafe with explicit funder - should use the explicit one
         let client = Client::new(&server.base_url(), Config::default())?
             .authentication_builder(&signer)
             .funder(explicit_funder)
-            .signature_type(SignatureType::GnosisSafe)
+            .signature_type(SignatureType::DepositWallet)
             .authenticate()
             .await?;
 
@@ -513,13 +409,12 @@ mod lifecycle {
             .build()
             .await?;
 
-        // Verify maker (funder) is the explicitly provided one, not auto-derived
-        assert_eq!(signable_order.order.maker, explicit_funder);
-        assert_eq!(signable_order.order.signer, signer.address());
-        assert_ne!(signable_order.order.maker, signable_order.order.signer);
+        // Verify maker/signer are the explicitly provided Deposit Wallet address.
+        assert_eq!(signable_order.order().maker, explicit_funder);
+        assert_eq!(signable_order.order().signer, explicit_funder);
         assert_eq!(
-            signable_order.order.signatureType,
-            SignatureType::GnosisSafe as u8
+            signable_order.order().signatureType,
+            SignatureType::DepositWallet as u8
         );
 
         Ok(())
@@ -583,7 +478,6 @@ mod limit {
             .price(dec!(0.5))
             .size(dec!(21.04))
             .side(Side::Buy)
-            .nonce(123)
             .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
             .build()
             .await
@@ -632,7 +526,6 @@ mod limit {
             .token_id(token_1())
             .size(dec!(21.04))
             .side(Side::Buy)
-            .nonce(123)
             .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
             .build()
             .await
@@ -646,7 +539,6 @@ mod limit {
             .token_id(token_1())
             .price(dec!(0.5))
             .side(Side::Buy)
-            .nonce(123)
             .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
             .build()
             .await
@@ -671,7 +563,6 @@ mod limit {
             .price(dec!(0.005))
             .size(dec!(21.04))
             .side(Side::Buy)
-            .nonce(123)
             .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
             .build()
             .await
@@ -699,7 +590,6 @@ mod limit {
             .price(dec!(-0.5))
             .size(dec!(21.04))
             .side(Side::Buy)
-            .nonce(123)
             .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
             .build()
             .await
@@ -714,7 +604,6 @@ mod limit {
             .price(dec!(0.5))
             .size(dec!(-21.04))
             .side(Side::Buy)
-            .nonce(123)
             .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
             .build()
             .await
@@ -743,28 +632,30 @@ mod limit {
                 .size(dec!(21.04))
                 .side(Side::Buy)
                 .order_type(OrderType::GTD)
-                .nonce(123)
                 .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
                 .build()
                 .await?;
 
-            let maker_amount = signable_order.order.makerAmount;
-            let taker_amount = signable_order.order.takerAmount;
+            let maker_amount = signable_order.order().makerAmount;
+            let taker_amount = signable_order.order().takerAmount;
 
             let price = to_decimal(maker_amount) / to_decimal(taker_amount);
             assert_eq!(price, dec!(0.50));
 
-            assert_eq!(signable_order.order.maker, client.address());
-            assert_eq!(signable_order.order.signer, client.address());
-            assert_eq!(signable_order.order.taker, Address::ZERO);
-            assert_eq!(signable_order.order.tokenId, token_1());
-            assert_eq!(signable_order.order.makerAmount, U256::from(10_520_000));
-            assert_eq!(signable_order.order.takerAmount, U256::from(21_040_000));
-            assert_eq!(signable_order.order.expiration, U256::from(50000));
-            assert_eq!(signable_order.order.nonce, U256::from(123));
-            assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-            assert_eq!(signable_order.order.side, Side::Buy as u8);
-            assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+            assert_eq!(signable_order.order().maker, client.address());
+            assert_eq!(signable_order.order().signer, client.address());
+            assert_eq!(signable_order.order().taker, Address::ZERO);
+            assert_eq!(signable_order.order().tokenId, token_1());
+            assert_eq!(signable_order.order().makerAmount, U256::from(10_520_000));
+            assert_eq!(signable_order.order().takerAmount, U256::from(21_040_000));
+            assert_eq!(signable_order.order().expiration, U256::from(50000));
+            assert_eq!(signable_order.order().nonce, U256::from(123));
+            assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+            assert_eq!(signable_order.order().side, Side::Buy as u8);
+            assert_eq!(
+                signable_order.order().signatureType,
+                SignatureType::DepositWallet as u8
+            );
 
             Ok(())
         }
@@ -783,28 +674,30 @@ mod limit {
                 .size(dec!(21.04))
                 .side(Side::Buy)
                 .order_type(OrderType::GTD)
-                .nonce(123)
                 .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
                 .build()
                 .await?;
 
-            let maker_amount = signable_order.order.makerAmount;
-            let taker_amount = signable_order.order.takerAmount;
+            let maker_amount = signable_order.order().makerAmount;
+            let taker_amount = signable_order.order().takerAmount;
 
             let price = to_decimal(maker_amount) / to_decimal(taker_amount);
             assert_eq!(price, dec!(0.56));
 
-            assert_eq!(signable_order.order.maker, client.address());
-            assert_eq!(signable_order.order.signer, client.address());
-            assert_eq!(signable_order.order.taker, Address::ZERO);
-            assert_eq!(signable_order.order.tokenId, token_1());
-            assert_eq!(signable_order.order.makerAmount, U256::from(11_782_400));
-            assert_eq!(signable_order.order.takerAmount, U256::from(21_040_000));
-            assert_eq!(signable_order.order.expiration, U256::from(50000));
-            assert_eq!(signable_order.order.nonce, U256::from(123));
-            assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-            assert_eq!(signable_order.order.side, Side::Buy as u8);
-            assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+            assert_eq!(signable_order.order().maker, client.address());
+            assert_eq!(signable_order.order().signer, client.address());
+            assert_eq!(signable_order.order().taker, Address::ZERO);
+            assert_eq!(signable_order.order().tokenId, token_1());
+            assert_eq!(signable_order.order().makerAmount, U256::from(11_782_400));
+            assert_eq!(signable_order.order().takerAmount, U256::from(21_040_000));
+            assert_eq!(signable_order.order().expiration, U256::from(50000));
+            assert_eq!(signable_order.order().nonce, U256::from(123));
+            assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+            assert_eq!(signable_order.order().side, Side::Buy as u8);
+            assert_eq!(
+                signable_order.order().signatureType,
+                SignatureType::DepositWallet as u8
+            );
 
             Ok(())
         }
@@ -823,28 +716,30 @@ mod limit {
                 .size(dec!(21.04))
                 .side(Side::Buy)
                 .order_type(OrderType::GTD)
-                .nonce(123)
                 .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
                 .build()
                 .await?;
 
-            let maker_amount = signable_order.order.makerAmount;
-            let taker_amount = signable_order.order.takerAmount;
+            let maker_amount = signable_order.order().makerAmount;
+            let taker_amount = signable_order.order().takerAmount;
 
             let price = to_decimal(maker_amount) / to_decimal(taker_amount);
             assert_eq!(price, dec!(0.056));
 
-            assert_eq!(signable_order.order.maker, client.address());
-            assert_eq!(signable_order.order.signer, client.address());
-            assert_eq!(signable_order.order.taker, Address::ZERO);
-            assert_eq!(signable_order.order.tokenId, token_1());
-            assert_eq!(signable_order.order.makerAmount, U256::from(1_178_240));
-            assert_eq!(signable_order.order.takerAmount, U256::from(21_040_000));
-            assert_eq!(signable_order.order.expiration, U256::from(50000));
-            assert_eq!(signable_order.order.nonce, U256::from(123));
-            assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-            assert_eq!(signable_order.order.side, Side::Buy as u8);
-            assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+            assert_eq!(signable_order.order().maker, client.address());
+            assert_eq!(signable_order.order().signer, client.address());
+            assert_eq!(signable_order.order().taker, Address::ZERO);
+            assert_eq!(signable_order.order().tokenId, token_1());
+            assert_eq!(signable_order.order().makerAmount, U256::from(1_178_240));
+            assert_eq!(signable_order.order().takerAmount, U256::from(21_040_000));
+            assert_eq!(signable_order.order().expiration, U256::from(50000));
+            assert_eq!(signable_order.order().nonce, U256::from(123));
+            assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+            assert_eq!(signable_order.order().side, Side::Buy as u8);
+            assert_eq!(
+                signable_order.order().signatureType,
+                SignatureType::DepositWallet as u8
+            );
 
             Ok(())
         }
@@ -863,28 +758,30 @@ mod limit {
                 .size(dec!(21.04))
                 .side(Side::Buy)
                 .order_type(OrderType::GTD)
-                .nonce(123)
                 .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
                 .build()
                 .await?;
 
-            let maker_amount = signable_order.order.makerAmount;
-            let taker_amount = signable_order.order.takerAmount;
+            let maker_amount = signable_order.order().makerAmount;
+            let taker_amount = signable_order.order().takerAmount;
 
             let price = to_decimal(maker_amount) / to_decimal(taker_amount);
             assert_eq!(price, dec!(0.0056));
 
-            assert_eq!(signable_order.order.maker, client.address());
-            assert_eq!(signable_order.order.signer, client.address());
-            assert_eq!(signable_order.order.taker, Address::ZERO);
-            assert_eq!(signable_order.order.tokenId, token_1());
-            assert_eq!(signable_order.order.makerAmount, U256::from(117_824));
-            assert_eq!(signable_order.order.takerAmount, U256::from(21_040_000));
-            assert_eq!(signable_order.order.expiration, U256::from(50000));
-            assert_eq!(signable_order.order.nonce, U256::from(123));
-            assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-            assert_eq!(signable_order.order.side, Side::Buy as u8);
-            assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+            assert_eq!(signable_order.order().maker, client.address());
+            assert_eq!(signable_order.order().signer, client.address());
+            assert_eq!(signable_order.order().taker, Address::ZERO);
+            assert_eq!(signable_order.order().tokenId, token_1());
+            assert_eq!(signable_order.order().makerAmount, U256::from(117_824));
+            assert_eq!(signable_order.order().takerAmount, U256::from(21_040_000));
+            assert_eq!(signable_order.order().expiration, U256::from(50000));
+            assert_eq!(signable_order.order().nonce, U256::from(123));
+            assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+            assert_eq!(signable_order.order().side, Side::Buy as u8);
+            assert_eq!(
+                signable_order.order().signatureType,
+                SignatureType::DepositWallet as u8
+            );
 
             Ok(())
         }
@@ -905,8 +802,8 @@ mod limit {
                 .build()
                 .await?;
 
-            assert_eq!(signable_order.order.makerAmount, U256::from(3_600_000));
-            assert_eq!(signable_order.order.takerAmount, U256::from(15_000_000));
+            assert_eq!(signable_order.order().makerAmount, U256::from(3_600_000));
+            assert_eq!(signable_order.order().takerAmount, U256::from(15_000_000));
 
             Ok(())
         }
@@ -927,8 +824,8 @@ mod limit {
                 .build()
                 .await?;
 
-            assert_eq!(signable_order.order.makerAmount, U256::from(82_820_000));
-            assert_eq!(signable_order.order.takerAmount, U256::from(101_000_000));
+            assert_eq!(signable_order.order().makerAmount, U256::from(82_820_000));
+            assert_eq!(signable_order.order().takerAmount, U256::from(101_000_000));
 
             Ok(())
         }
@@ -976,11 +873,11 @@ mod limit {
                 .await?;
 
             assert_eq!(
-                signable_order.order.makerAmount,
+                signable_order.order().makerAmount,
                 U256::from(10_575_331_400_u64)
             );
             assert_eq!(
-                signable_order.order.takerAmount,
+                signable_order.order().takerAmount,
                 U256::from(18_233_330_000_u64)
             );
 
@@ -1005,28 +902,30 @@ mod limit {
                 .size(dec!(21.04))
                 .side(Side::Sell)
                 .order_type(OrderType::GTD)
-                .nonce(123)
                 .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
                 .build()
                 .await?;
 
-            let maker_amount = signable_order.order.makerAmount;
-            let taker_amount = signable_order.order.takerAmount;
+            let maker_amount = signable_order.order().makerAmount;
+            let taker_amount = signable_order.order().takerAmount;
 
             let price = to_decimal(taker_amount) / to_decimal(maker_amount);
             assert_eq!(price, dec!(0.50));
 
-            assert_eq!(signable_order.order.maker, client.address());
-            assert_eq!(signable_order.order.signer, client.address());
-            assert_eq!(signable_order.order.taker, Address::ZERO);
-            assert_eq!(signable_order.order.tokenId, token_1());
-            assert_eq!(signable_order.order.makerAmount, U256::from(21_040_000));
-            assert_eq!(signable_order.order.takerAmount, U256::from(10_520_000));
-            assert_eq!(signable_order.order.expiration, U256::from(50000));
-            assert_eq!(signable_order.order.nonce, U256::from(123));
-            assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-            assert_eq!(signable_order.order.side, Side::Sell as u8);
-            assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+            assert_eq!(signable_order.order().maker, client.address());
+            assert_eq!(signable_order.order().signer, client.address());
+            assert_eq!(signable_order.order().taker, Address::ZERO);
+            assert_eq!(signable_order.order().tokenId, token_1());
+            assert_eq!(signable_order.order().makerAmount, U256::from(21_040_000));
+            assert_eq!(signable_order.order().takerAmount, U256::from(10_520_000));
+            assert_eq!(signable_order.order().expiration, U256::from(50000));
+            assert_eq!(signable_order.order().nonce, U256::from(123));
+            assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+            assert_eq!(signable_order.order().side, Side::Sell as u8);
+            assert_eq!(
+                signable_order.order().signatureType,
+                SignatureType::DepositWallet as u8
+            );
 
             Ok(())
         }
@@ -1045,28 +944,30 @@ mod limit {
                 .size(dec!(21.04))
                 .side(Side::Sell)
                 .order_type(OrderType::GTD)
-                .nonce(123)
                 .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
                 .build()
                 .await?;
 
-            let maker_amount = signable_order.order.makerAmount;
-            let taker_amount = signable_order.order.takerAmount;
+            let maker_amount = signable_order.order().makerAmount;
+            let taker_amount = signable_order.order().takerAmount;
 
             let price = to_decimal(taker_amount) / to_decimal(maker_amount);
             assert_eq!(price, dec!(0.56));
 
-            assert_eq!(signable_order.order.maker, client.address());
-            assert_eq!(signable_order.order.signer, client.address());
-            assert_eq!(signable_order.order.taker, Address::ZERO);
-            assert_eq!(signable_order.order.tokenId, token_1());
-            assert_eq!(signable_order.order.makerAmount, U256::from(21_040_000));
-            assert_eq!(signable_order.order.takerAmount, U256::from(11_782_400));
-            assert_eq!(signable_order.order.expiration, U256::from(50000));
-            assert_eq!(signable_order.order.nonce, U256::from(123));
-            assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-            assert_eq!(signable_order.order.side, Side::Sell as u8);
-            assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+            assert_eq!(signable_order.order().maker, client.address());
+            assert_eq!(signable_order.order().signer, client.address());
+            assert_eq!(signable_order.order().taker, Address::ZERO);
+            assert_eq!(signable_order.order().tokenId, token_1());
+            assert_eq!(signable_order.order().makerAmount, U256::from(21_040_000));
+            assert_eq!(signable_order.order().takerAmount, U256::from(11_782_400));
+            assert_eq!(signable_order.order().expiration, U256::from(50000));
+            assert_eq!(signable_order.order().nonce, U256::from(123));
+            assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+            assert_eq!(signable_order.order().side, Side::Sell as u8);
+            assert_eq!(
+                signable_order.order().signatureType,
+                SignatureType::DepositWallet as u8
+            );
 
             Ok(())
         }
@@ -1085,28 +986,30 @@ mod limit {
                 .size(dec!(21.04))
                 .side(Side::Sell)
                 .order_type(OrderType::GTD)
-                .nonce(123)
                 .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
                 .build()
                 .await?;
 
-            let maker_amount = signable_order.order.makerAmount;
-            let taker_amount = signable_order.order.takerAmount;
+            let maker_amount = signable_order.order().makerAmount;
+            let taker_amount = signable_order.order().takerAmount;
 
             let price = to_decimal(taker_amount) / to_decimal(maker_amount);
             assert_eq!(price, dec!(0.056));
 
-            assert_eq!(signable_order.order.maker, client.address());
-            assert_eq!(signable_order.order.signer, client.address());
-            assert_eq!(signable_order.order.taker, Address::ZERO);
-            assert_eq!(signable_order.order.tokenId, token_1());
-            assert_eq!(signable_order.order.makerAmount, U256::from(21_040_000));
-            assert_eq!(signable_order.order.takerAmount, U256::from(1_178_240));
-            assert_eq!(signable_order.order.expiration, U256::from(50000));
-            assert_eq!(signable_order.order.nonce, U256::from(123));
-            assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-            assert_eq!(signable_order.order.side, Side::Sell as u8);
-            assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+            assert_eq!(signable_order.order().maker, client.address());
+            assert_eq!(signable_order.order().signer, client.address());
+            assert_eq!(signable_order.order().taker, Address::ZERO);
+            assert_eq!(signable_order.order().tokenId, token_1());
+            assert_eq!(signable_order.order().makerAmount, U256::from(21_040_000));
+            assert_eq!(signable_order.order().takerAmount, U256::from(1_178_240));
+            assert_eq!(signable_order.order().expiration, U256::from(50000));
+            assert_eq!(signable_order.order().nonce, U256::from(123));
+            assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+            assert_eq!(signable_order.order().side, Side::Sell as u8);
+            assert_eq!(
+                signable_order.order().signatureType,
+                SignatureType::DepositWallet as u8
+            );
 
             Ok(())
         }
@@ -1125,28 +1028,30 @@ mod limit {
                 .size(dec!(21.04))
                 .side(Side::Sell)
                 .order_type(OrderType::GTD)
-                .nonce(123)
                 .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
                 .build()
                 .await?;
 
-            let maker_amount = signable_order.order.makerAmount;
-            let taker_amount = signable_order.order.takerAmount;
+            let maker_amount = signable_order.order().makerAmount;
+            let taker_amount = signable_order.order().takerAmount;
 
             let price = to_decimal(taker_amount) / to_decimal(maker_amount);
             assert_eq!(price, dec!(0.0056));
 
-            assert_eq!(signable_order.order.maker, client.address());
-            assert_eq!(signable_order.order.signer, client.address());
-            assert_eq!(signable_order.order.taker, Address::ZERO);
-            assert_eq!(signable_order.order.tokenId, token_1());
-            assert_eq!(signable_order.order.makerAmount, U256::from(21_040_000));
-            assert_eq!(signable_order.order.takerAmount, U256::from(117_824));
-            assert_eq!(signable_order.order.expiration, U256::from(50000));
-            assert_eq!(signable_order.order.nonce, U256::from(123));
-            assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-            assert_eq!(signable_order.order.side, Side::Sell as u8);
-            assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+            assert_eq!(signable_order.order().maker, client.address());
+            assert_eq!(signable_order.order().signer, client.address());
+            assert_eq!(signable_order.order().taker, Address::ZERO);
+            assert_eq!(signable_order.order().tokenId, token_1());
+            assert_eq!(signable_order.order().makerAmount, U256::from(21_040_000));
+            assert_eq!(signable_order.order().takerAmount, U256::from(117_824));
+            assert_eq!(signable_order.order().expiration, U256::from(50000));
+            assert_eq!(signable_order.order().nonce, U256::from(123));
+            assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+            assert_eq!(signable_order.order().side, Side::Sell as u8);
+            assert_eq!(
+                signable_order.order().signatureType,
+                SignatureType::DepositWallet as u8
+            );
 
             Ok(())
         }
@@ -1167,8 +1072,8 @@ mod limit {
                 .build()
                 .await?;
 
-            assert_eq!(signable_order.order.makerAmount, U256::from(15_000_000));
-            assert_eq!(signable_order.order.takerAmount, U256::from(3_600_000));
+            assert_eq!(signable_order.order().makerAmount, U256::from(15_000_000));
+            assert_eq!(signable_order.order().takerAmount, U256::from(3_600_000));
 
             Ok(())
         }
@@ -1189,8 +1094,8 @@ mod limit {
                 .build()
                 .await?;
 
-            assert_eq!(signable_order.order.makerAmount, U256::from(101_000_000));
-            assert_eq!(signable_order.order.takerAmount, U256::from(82_820_000));
+            assert_eq!(signable_order.order().makerAmount, U256::from(101_000_000));
+            assert_eq!(signable_order.order().takerAmount, U256::from(82_820_000));
 
             Ok(())
         }
@@ -1239,10 +1144,10 @@ mod limit {
                 .await?;
 
             assert_eq!(
-                signable_order.order.makerAmount,
+                signable_order.order().makerAmount,
                 U256::from(2_435_890_000_u64)
             );
-            assert_eq!(signable_order.order.takerAmount, U256::from(949_997_100));
+            assert_eq!(signable_order.order().takerAmount, U256::from(949_997_100));
 
             Ok(())
         }
@@ -1263,8 +1168,8 @@ mod limit {
                 .build()
                 .await?;
 
-            assert_eq!(signable_order.order.makerAmount, U256::from(19_100_000));
-            assert_eq!(signable_order.order.takerAmount, U256::from(8_213_000));
+            assert_eq!(signable_order.order().makerAmount, U256::from(19_100_000));
+            assert_eq!(signable_order.order().takerAmount, U256::from(8_213_000));
 
             Ok(())
         }
@@ -1292,16 +1197,19 @@ mod limit {
             .build()
             .await?;
 
-        assert_eq!(signable_order.order.maker, client.address());
-        assert_eq!(signable_order.order.taker, Address::ZERO);
-        assert_eq!(signable_order.order.tokenId, token_1());
-        assert_eq!(signable_order.order.makerAmount, U256::from(51_200_000));
-        assert_eq!(signable_order.order.takerAmount, U256::from(100_000_000));
-        assert_eq!(signable_order.order.expiration, U256::ZERO);
-        assert_eq!(signable_order.order.nonce, U256::ZERO);
-        assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-        assert_eq!(signable_order.order.side, Side::Buy as u8);
-        assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+        assert_eq!(signable_order.order().maker, client.address());
+        assert_eq!(signable_order.order().taker, Address::ZERO);
+        assert_eq!(signable_order.order().tokenId, token_1());
+        assert_eq!(signable_order.order().makerAmount, U256::from(51_200_000));
+        assert_eq!(signable_order.order().takerAmount, U256::from(100_000_000));
+        assert_eq!(signable_order.order().expiration, U256::ZERO);
+        assert_eq!(signable_order.order().nonce, U256::ZERO);
+        assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+        assert_eq!(signable_order.order().side, Side::Buy as u8);
+        assert_eq!(
+            signable_order.order().signatureType,
+            SignatureType::DepositWallet as u8
+        );
 
         let signable_order = client
             .limit_order()
@@ -1312,16 +1220,19 @@ mod limit {
             .build()
             .await?;
 
-        assert_eq!(signable_order.order.maker, client.address());
-        assert_eq!(signable_order.order.taker, Address::ZERO);
-        assert_eq!(signable_order.order.tokenId, token_2());
-        assert_eq!(signable_order.order.makerAmount, U256::from(9_999_600));
-        assert_eq!(signable_order.order.takerAmount, U256::from(12_820_000));
-        assert_eq!(signable_order.order.expiration, U256::ZERO);
-        assert_eq!(signable_order.order.nonce, U256::ZERO);
-        assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-        assert_eq!(signable_order.order.side, Side::Buy as u8);
-        assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+        assert_eq!(signable_order.order().maker, client.address());
+        assert_eq!(signable_order.order().taker, Address::ZERO);
+        assert_eq!(signable_order.order().tokenId, token_2());
+        assert_eq!(signable_order.order().makerAmount, U256::from(9_999_600));
+        assert_eq!(signable_order.order().takerAmount, U256::from(12_820_000));
+        assert_eq!(signable_order.order().expiration, U256::ZERO);
+        assert_eq!(signable_order.order().nonce, U256::ZERO);
+        assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+        assert_eq!(signable_order.order().side, Side::Buy as u8);
+        assert_eq!(
+            signable_order.order().signatureType,
+            SignatureType::DepositWallet as u8
+        );
 
         let _order = client
             .limit_order()
@@ -1493,28 +1404,31 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(maker_amount) / to_decimal(taker_amount);
                 assert_eq!(price, dec!(0.5));
 
-                assert_eq!(signable_order.order.maker, client.address());
-                assert_eq!(signable_order.order.signer, client.address());
-                assert_eq!(signable_order.order.taker, Address::ZERO);
+                assert_eq!(signable_order.order().maker, client.address());
+                assert_eq!(signable_order.order().signer, client.address());
+                assert_eq!(signable_order.order().taker, Address::ZERO);
                 assert_eq!(
-                    signable_order.order.tokenId,
+                    signable_order.order().tokenId,
                     U256::from_str(
                         "15871154585880608648532107628464183779895785213830018178010423617714102767076"
                     )?
                 );
-                assert_eq!(signable_order.order.makerAmount, U256::from(100_000_000)); // 100 USDC
-                assert_eq!(signable_order.order.takerAmount, U256::from(200_000_000)); // 200 `token_1()` tokens
-                assert_eq!(signable_order.order.expiration, U256::ZERO);
-                assert_eq!(signable_order.order.nonce, U256::ZERO);
-                assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-                assert_eq!(signable_order.order.side, Side::Buy as u8);
-                assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+                assert_eq!(signable_order.order().makerAmount, U256::from(100_000_000)); // 100 USDC
+                assert_eq!(signable_order.order().takerAmount, U256::from(200_000_000)); // 200 `token_1()` tokens
+                assert_eq!(signable_order.order().expiration, U256::ZERO);
+                assert_eq!(signable_order.order().nonce, U256::ZERO);
+                assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+                assert_eq!(signable_order.order().side, Side::Buy as u8);
+                assert_eq!(
+                    signable_order.order().signatureType,
+                    SignatureType::DepositWallet as u8
+                );
 
                 Ok(())
             }
@@ -1553,8 +1467,8 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(maker_amount) / to_decimal(taker_amount);
                 assert_eq!(price, dec!(0.4));
@@ -1599,8 +1513,8 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(maker_amount) / to_decimal(taker_amount);
                 assert_eq!(price, dec!(0.5));
@@ -1645,8 +1559,8 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(maker_amount) / to_decimal(taker_amount);
                 assert_eq!(price, dec!(0.5));
@@ -1715,28 +1629,31 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(maker_amount) / to_decimal(taker_amount);
                 assert_eq!(price, dec!(0.5));
 
-                assert_eq!(signable_order.order.maker, client.address());
-                assert_eq!(signable_order.order.signer, client.address());
-                assert_eq!(signable_order.order.taker, Address::ZERO);
+                assert_eq!(signable_order.order().maker, client.address());
+                assert_eq!(signable_order.order().signer, client.address());
+                assert_eq!(signable_order.order().taker, Address::ZERO);
                 assert_eq!(
-                    signable_order.order.tokenId,
+                    signable_order.order().tokenId,
                     U256::from_str(
                         "15871154585880608648532107628464183779895785213830018178010423617714102767076"
                     )?
                 );
-                assert_eq!(signable_order.order.makerAmount, U256::from(100_000_000)); // 100 USDC
-                assert_eq!(signable_order.order.takerAmount, U256::from(200_000_000)); // 200 `token_1()` tokens
-                assert_eq!(signable_order.order.expiration, U256::ZERO);
-                assert_eq!(signable_order.order.nonce, U256::ZERO);
-                assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-                assert_eq!(signable_order.order.side, Side::Buy as u8);
-                assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+                assert_eq!(signable_order.order().makerAmount, U256::from(100_000_000)); // 100 USDC
+                assert_eq!(signable_order.order().takerAmount, U256::from(200_000_000)); // 200 `token_1()` tokens
+                assert_eq!(signable_order.order().expiration, U256::ZERO);
+                assert_eq!(signable_order.order().nonce, U256::ZERO);
+                assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+                assert_eq!(signable_order.order().side, Side::Buy as u8);
+                assert_eq!(
+                    signable_order.order().signatureType,
+                    SignatureType::DepositWallet as u8
+                );
 
                 Ok(())
             }
@@ -1774,8 +1691,8 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(maker_amount) / to_decimal(taker_amount);
                 assert_eq!(price, dec!(0.5));
@@ -1819,8 +1736,8 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(maker_amount) / to_decimal(taker_amount);
                 assert_eq!(price, dec!(0.4));
@@ -1864,8 +1781,8 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(maker_amount) / to_decimal(taker_amount);
                 assert_eq!(price, dec!(0.5));
@@ -1909,8 +1826,8 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(maker_amount) / to_decimal(taker_amount);
                 assert_eq!(price, dec!(0.5));
@@ -1944,28 +1861,30 @@ mod market {
                 .token_id(token_1())
                 .amount(Amount::usdc(Decimal::ONE_HUNDRED)?)
                 .side(Side::Buy)
-                .nonce(123)
                 .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
                 .build()
                 .await?;
 
-            let maker_amount = signable_order.order.makerAmount;
-            let taker_amount = signable_order.order.takerAmount;
+            let maker_amount = signable_order.order().makerAmount;
+            let taker_amount = signable_order.order().takerAmount;
 
             let price = to_decimal(maker_amount) / to_decimal(taker_amount);
             assert_eq!(price, dec!(0.50));
 
-            assert_eq!(signable_order.order.maker, client.address());
-            assert_eq!(signable_order.order.signer, client.address());
-            assert_eq!(signable_order.order.taker, Address::ZERO);
-            assert_eq!(signable_order.order.tokenId, token_1());
-            assert_eq!(signable_order.order.makerAmount, U256::from(100_000_000));
-            assert_eq!(signable_order.order.takerAmount, U256::from(200_000_000));
-            assert_eq!(signable_order.order.expiration, U256::from(0));
-            assert_eq!(signable_order.order.nonce, U256::from(123));
-            assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-            assert_eq!(signable_order.order.side, Side::Buy as u8);
-            assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+            assert_eq!(signable_order.order().maker, client.address());
+            assert_eq!(signable_order.order().signer, client.address());
+            assert_eq!(signable_order.order().taker, Address::ZERO);
+            assert_eq!(signable_order.order().tokenId, token_1());
+            assert_eq!(signable_order.order().makerAmount, U256::from(100_000_000));
+            assert_eq!(signable_order.order().takerAmount, U256::from(200_000_000));
+            assert_eq!(signable_order.order().expiration, U256::from(0));
+            assert_eq!(signable_order.order().nonce, U256::from(123));
+            assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+            assert_eq!(signable_order.order().side, Side::Buy as u8);
+            assert_eq!(
+                signable_order.order().signatureType,
+                SignatureType::DepositWallet as u8
+            );
 
             Ok(())
         }
@@ -1992,29 +1911,31 @@ mod market {
                 .token_id(token_1())
                 .amount(Amount::usdc(Decimal::ONE_HUNDRED)?)
                 .side(Side::Buy)
-                .nonce(123)
                 .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
                 .build()
                 .await?;
 
-            let maker_amount = signable_order.order.makerAmount;
-            let taker_amount = signable_order.order.takerAmount;
+            let maker_amount = signable_order.order().makerAmount;
+            let taker_amount = signable_order.order().takerAmount;
 
             let price = (to_decimal(maker_amount) / to_decimal(taker_amount))
                 .trunc_with_scale(USDC_DECIMALS);
             assert_eq!(price, dec!(0.56));
 
-            assert_eq!(signable_order.order.maker, client.address());
-            assert_eq!(signable_order.order.signer, client.address());
-            assert_eq!(signable_order.order.taker, Address::ZERO);
-            assert_eq!(signable_order.order.tokenId, token_1());
-            assert_eq!(signable_order.order.makerAmount, U256::from(100_000_000));
-            assert_eq!(signable_order.order.takerAmount, U256::from(178_571_400));
-            assert_eq!(signable_order.order.expiration, U256::from(0));
-            assert_eq!(signable_order.order.nonce, U256::from(123));
-            assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-            assert_eq!(signable_order.order.side, Side::Buy as u8);
-            assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+            assert_eq!(signable_order.order().maker, client.address());
+            assert_eq!(signable_order.order().signer, client.address());
+            assert_eq!(signable_order.order().taker, Address::ZERO);
+            assert_eq!(signable_order.order().tokenId, token_1());
+            assert_eq!(signable_order.order().makerAmount, U256::from(100_000_000));
+            assert_eq!(signable_order.order().takerAmount, U256::from(178_571_400));
+            assert_eq!(signable_order.order().expiration, U256::from(0));
+            assert_eq!(signable_order.order().nonce, U256::from(123));
+            assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+            assert_eq!(signable_order.order().side, Side::Buy as u8);
+            assert_eq!(
+                signable_order.order().signatureType,
+                SignatureType::DepositWallet as u8
+            );
 
             Ok(())
         }
@@ -2041,29 +1962,34 @@ mod market {
                 .token_id(token_1())
                 .amount(Amount::usdc(Decimal::ONE_HUNDRED)?)
                 .side(Side::Buy)
-                .nonce(123)
                 .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
                 .build()
                 .await?;
 
-            let maker_amount = signable_order.order.makerAmount;
-            let taker_amount = signable_order.order.takerAmount;
+            let maker_amount = signable_order.order().makerAmount;
+            let taker_amount = signable_order.order().takerAmount;
 
             let price = (to_decimal(maker_amount) / to_decimal(taker_amount))
                 .trunc_with_scale(USDC_DECIMALS);
             assert_eq!(price, dec!(0.056));
 
-            assert_eq!(signable_order.order.maker, client.address());
-            assert_eq!(signable_order.order.signer, client.address());
-            assert_eq!(signable_order.order.taker, Address::ZERO);
-            assert_eq!(signable_order.order.tokenId, token_1());
-            assert_eq!(signable_order.order.makerAmount, U256::from(100_000_000));
-            assert_eq!(signable_order.order.takerAmount, U256::from(1_785_714_280));
-            assert_eq!(signable_order.order.expiration, U256::from(0));
-            assert_eq!(signable_order.order.nonce, U256::from(123));
-            assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-            assert_eq!(signable_order.order.side, Side::Buy as u8);
-            assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+            assert_eq!(signable_order.order().maker, client.address());
+            assert_eq!(signable_order.order().signer, client.address());
+            assert_eq!(signable_order.order().taker, Address::ZERO);
+            assert_eq!(signable_order.order().tokenId, token_1());
+            assert_eq!(signable_order.order().makerAmount, U256::from(100_000_000));
+            assert_eq!(
+                signable_order.order().takerAmount,
+                U256::from(1_785_714_280)
+            );
+            assert_eq!(signable_order.order().expiration, U256::from(0));
+            assert_eq!(signable_order.order().nonce, U256::from(123));
+            assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+            assert_eq!(signable_order.order().side, Side::Buy as u8);
+            assert_eq!(
+                signable_order.order().signatureType,
+                SignatureType::DepositWallet as u8
+            );
 
             Ok(())
         }
@@ -2090,32 +2016,34 @@ mod market {
                 .token_id(token_1())
                 .amount(Amount::usdc(Decimal::ONE_HUNDRED)?)
                 .side(Side::Buy)
-                .nonce(123)
                 .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
                 .build()
                 .await?;
 
-            let maker_amount = signable_order.order.makerAmount;
-            let taker_amount = signable_order.order.takerAmount;
+            let maker_amount = signable_order.order().makerAmount;
+            let taker_amount = signable_order.order().takerAmount;
 
             let price = (to_decimal(maker_amount) / to_decimal(taker_amount))
                 .trunc_with_scale(USDC_DECIMALS);
             assert_eq!(price, dec!(0.0056));
 
-            assert_eq!(signable_order.order.maker, client.address());
-            assert_eq!(signable_order.order.signer, client.address());
-            assert_eq!(signable_order.order.taker, Address::ZERO);
-            assert_eq!(signable_order.order.tokenId, token_1());
-            assert_eq!(signable_order.order.makerAmount, U256::from(100_000_000));
+            assert_eq!(signable_order.order().maker, client.address());
+            assert_eq!(signable_order.order().signer, client.address());
+            assert_eq!(signable_order.order().taker, Address::ZERO);
+            assert_eq!(signable_order.order().tokenId, token_1());
+            assert_eq!(signable_order.order().makerAmount, U256::from(100_000_000));
             assert_eq!(
-                signable_order.order.takerAmount,
+                signable_order.order().takerAmount,
                 U256::from(17_857_142_857_u64)
             );
-            assert_eq!(signable_order.order.expiration, U256::from(0));
-            assert_eq!(signable_order.order.nonce, U256::from(123));
-            assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-            assert_eq!(signable_order.order.side, Side::Buy as u8);
-            assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+            assert_eq!(signable_order.order().expiration, U256::from(0));
+            assert_eq!(signable_order.order().nonce, U256::from(123));
+            assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+            assert_eq!(signable_order.order().side, Side::Buy as u8);
+            assert_eq!(
+                signable_order.order().signatureType,
+                SignatureType::DepositWallet as u8
+            );
 
             Ok(())
         }
@@ -2219,8 +2147,8 @@ mod market {
                 .await?;
 
             // maker = USDC, taker = shares
-            assert_eq!(signable_order.order.makerAmount, U256::from(100_000_000)); // 250 * 0.4 = 100
-            assert_eq!(signable_order.order.takerAmount, U256::from(250_000_000));
+            assert_eq!(signable_order.order().makerAmount, U256::from(100_000_000)); // 250 * 0.4 = 100
+            assert_eq!(signable_order.order().takerAmount, U256::from(250_000_000));
             Ok(())
         }
 
@@ -2257,8 +2185,8 @@ mod market {
                 .await?;
 
             // maker = USDC, taker = shares
-            assert_eq!(signable_order.order.makerAmount, U256::from(125_000_000)); // 250 * 0.5 = 125
-            assert_eq!(signable_order.order.takerAmount, U256::from(250_000_000));
+            assert_eq!(signable_order.order().makerAmount, U256::from(125_000_000)); // 250 * 0.5 = 125
+            assert_eq!(signable_order.order().takerAmount, U256::from(250_000_000));
             Ok(())
         }
     }
@@ -2369,28 +2297,31 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(taker_amount) / to_decimal(maker_amount);
                 assert_eq!(price, dec!(0.5));
 
-                assert_eq!(signable_order.order.maker, client.address());
-                assert_eq!(signable_order.order.signer, client.address());
-                assert_eq!(signable_order.order.taker, Address::ZERO);
+                assert_eq!(signable_order.order().maker, client.address());
+                assert_eq!(signable_order.order().signer, client.address());
+                assert_eq!(signable_order.order().taker, Address::ZERO);
                 assert_eq!(
-                    signable_order.order.tokenId,
+                    signable_order.order().tokenId,
                     U256::from_str(
                         "15871154585880608648532107628464183779895785213830018178010423617714102767076"
                     )?
                 );
                 assert_eq!(maker_amount, U256::from(100_000_000)); // 100 `token_1()` tokens
                 assert_eq!(taker_amount, U256::from(50_000_000)); // 50 USDC
-                assert_eq!(signable_order.order.expiration, U256::ZERO);
-                assert_eq!(signable_order.order.nonce, U256::ZERO);
-                assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-                assert_eq!(signable_order.order.side, Side::Sell as u8);
-                assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+                assert_eq!(signable_order.order().expiration, U256::ZERO);
+                assert_eq!(signable_order.order().nonce, U256::ZERO);
+                assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+                assert_eq!(signable_order.order().side, Side::Sell as u8);
+                assert_eq!(
+                    signable_order.order().signatureType,
+                    SignatureType::DepositWallet as u8
+                );
 
                 Ok(())
             }
@@ -2429,8 +2360,8 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(taker_amount) / to_decimal(maker_amount);
                 assert_eq!(price, dec!(0.4));
@@ -2475,8 +2406,8 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(taker_amount) / to_decimal(maker_amount);
                 assert_eq!(price, dec!(0.4));
@@ -2521,8 +2452,8 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(taker_amount) / to_decimal(maker_amount);
                 assert_eq!(price, dec!(0.3));
@@ -2567,8 +2498,8 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(taker_amount) / to_decimal(maker_amount);
                 assert_eq!(price, dec!(0.3));
@@ -2637,28 +2568,31 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(taker_amount) / to_decimal(maker_amount);
                 assert_eq!(price, dec!(0.4));
 
-                assert_eq!(signable_order.order.maker, client.address());
-                assert_eq!(signable_order.order.signer, client.address());
-                assert_eq!(signable_order.order.taker, Address::ZERO);
+                assert_eq!(signable_order.order().maker, client.address());
+                assert_eq!(signable_order.order().signer, client.address());
+                assert_eq!(signable_order.order().taker, Address::ZERO);
                 assert_eq!(
-                    signable_order.order.tokenId,
+                    signable_order.order().tokenId,
                     U256::from_str(
                         "15871154585880608648532107628464183779895785213830018178010423617714102767076"
                     )?
                 );
-                assert_eq!(signable_order.order.makerAmount, U256::from(100_000_000)); // 100 USDC
-                assert_eq!(signable_order.order.takerAmount, U256::from(40_000_000)); // 40 `token_1()` tokens
-                assert_eq!(signable_order.order.expiration, U256::ZERO);
-                assert_eq!(signable_order.order.nonce, U256::ZERO);
-                assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-                assert_eq!(signable_order.order.side, Side::Sell as u8);
-                assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+                assert_eq!(signable_order.order().makerAmount, U256::from(100_000_000)); // 100 USDC
+                assert_eq!(signable_order.order().takerAmount, U256::from(40_000_000)); // 40 `token_1()` tokens
+                assert_eq!(signable_order.order().expiration, U256::ZERO);
+                assert_eq!(signable_order.order().nonce, U256::ZERO);
+                assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+                assert_eq!(signable_order.order().side, Side::Sell as u8);
+                assert_eq!(
+                    signable_order.order().signatureType,
+                    SignatureType::DepositWallet as u8
+                );
 
                 Ok(())
             }
@@ -2696,8 +2630,8 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(taker_amount) / to_decimal(maker_amount);
                 assert_eq!(price, dec!(0.5));
@@ -2741,8 +2675,8 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(taker_amount) / to_decimal(maker_amount);
                 assert_eq!(price, dec!(0.4));
@@ -2786,8 +2720,8 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(taker_amount) / to_decimal(maker_amount);
                 assert_eq!(price, dec!(0.4));
@@ -2831,8 +2765,8 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(taker_amount) / to_decimal(maker_amount);
                 assert_eq!(price, dec!(0.5));
@@ -2876,8 +2810,8 @@ mod market {
                     .build()
                     .await?;
 
-                let maker_amount = signable_order.order.makerAmount;
-                let taker_amount = signable_order.order.takerAmount;
+                let maker_amount = signable_order.order().makerAmount;
+                let taker_amount = signable_order.order().takerAmount;
 
                 let price = to_decimal(taker_amount) / to_decimal(maker_amount);
                 assert_eq!(price, dec!(0.3));
@@ -2911,28 +2845,30 @@ mod market {
                 .token_id(token_1())
                 .amount(Amount::shares(Decimal::ONE_HUNDRED)?)
                 .side(Side::Sell)
-                .nonce(123)
                 .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
                 .build()
                 .await?;
 
-            let maker_amount = signable_order.order.makerAmount;
-            let taker_amount = signable_order.order.takerAmount;
+            let maker_amount = signable_order.order().makerAmount;
+            let taker_amount = signable_order.order().takerAmount;
 
             let price = to_decimal(taker_amount) / to_decimal(maker_amount);
             assert_eq!(price, dec!(0.50));
 
-            assert_eq!(signable_order.order.maker, client.address());
-            assert_eq!(signable_order.order.signer, client.address());
-            assert_eq!(signable_order.order.taker, Address::ZERO);
-            assert_eq!(signable_order.order.tokenId, token_1());
-            assert_eq!(signable_order.order.makerAmount, U256::from(100_000_000));
-            assert_eq!(signable_order.order.takerAmount, U256::from(50_000_000));
-            assert_eq!(signable_order.order.expiration, U256::from(0));
-            assert_eq!(signable_order.order.nonce, U256::from(123));
-            assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-            assert_eq!(signable_order.order.side, Side::Sell as u8);
-            assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+            assert_eq!(signable_order.order().maker, client.address());
+            assert_eq!(signable_order.order().signer, client.address());
+            assert_eq!(signable_order.order().taker, Address::ZERO);
+            assert_eq!(signable_order.order().tokenId, token_1());
+            assert_eq!(signable_order.order().makerAmount, U256::from(100_000_000));
+            assert_eq!(signable_order.order().takerAmount, U256::from(50_000_000));
+            assert_eq!(signable_order.order().expiration, U256::from(0));
+            assert_eq!(signable_order.order().nonce, U256::from(123));
+            assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+            assert_eq!(signable_order.order().side, Side::Sell as u8);
+            assert_eq!(
+                signable_order.order().signatureType,
+                SignatureType::DepositWallet as u8
+            );
 
             Ok(())
         }
@@ -2959,29 +2895,31 @@ mod market {
                 .token_id(token_1())
                 .amount(Amount::shares(Decimal::ONE_HUNDRED)?)
                 .side(Side::Sell)
-                .nonce(123)
                 .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
                 .build()
                 .await?;
 
-            let maker_amount = signable_order.order.makerAmount;
-            let taker_amount = signable_order.order.takerAmount;
+            let maker_amount = signable_order.order().makerAmount;
+            let taker_amount = signable_order.order().takerAmount;
 
             let price = (to_decimal(taker_amount) / to_decimal(maker_amount))
                 .trunc_with_scale(USDC_DECIMALS);
             assert_eq!(price, dec!(0.56));
 
-            assert_eq!(signable_order.order.maker, client.address());
-            assert_eq!(signable_order.order.signer, client.address());
-            assert_eq!(signable_order.order.taker, Address::ZERO);
-            assert_eq!(signable_order.order.tokenId, token_1());
-            assert_eq!(signable_order.order.makerAmount, U256::from(100_000_000));
-            assert_eq!(signable_order.order.takerAmount, U256::from(56_000_000));
-            assert_eq!(signable_order.order.expiration, U256::from(0));
-            assert_eq!(signable_order.order.nonce, U256::from(123));
-            assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-            assert_eq!(signable_order.order.side, Side::Sell as u8);
-            assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+            assert_eq!(signable_order.order().maker, client.address());
+            assert_eq!(signable_order.order().signer, client.address());
+            assert_eq!(signable_order.order().taker, Address::ZERO);
+            assert_eq!(signable_order.order().tokenId, token_1());
+            assert_eq!(signable_order.order().makerAmount, U256::from(100_000_000));
+            assert_eq!(signable_order.order().takerAmount, U256::from(56_000_000));
+            assert_eq!(signable_order.order().expiration, U256::from(0));
+            assert_eq!(signable_order.order().nonce, U256::from(123));
+            assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+            assert_eq!(signable_order.order().side, Side::Sell as u8);
+            assert_eq!(
+                signable_order.order().signatureType,
+                SignatureType::DepositWallet as u8
+            );
 
             Ok(())
         }
@@ -3008,29 +2946,31 @@ mod market {
                 .token_id(token_1())
                 .amount(Amount::shares(Decimal::ONE_HUNDRED)?)
                 .side(Side::Sell)
-                .nonce(123)
                 .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
                 .build()
                 .await?;
 
-            let maker_amount = signable_order.order.makerAmount;
-            let taker_amount = signable_order.order.takerAmount;
+            let maker_amount = signable_order.order().makerAmount;
+            let taker_amount = signable_order.order().takerAmount;
 
             let price = (to_decimal(taker_amount) / to_decimal(maker_amount))
                 .trunc_with_scale(USDC_DECIMALS);
             assert_eq!(price, dec!(0.056));
 
-            assert_eq!(signable_order.order.maker, client.address());
-            assert_eq!(signable_order.order.signer, client.address());
-            assert_eq!(signable_order.order.taker, Address::ZERO);
-            assert_eq!(signable_order.order.tokenId, token_1());
-            assert_eq!(signable_order.order.makerAmount, U256::from(100_000_000));
-            assert_eq!(signable_order.order.takerAmount, U256::from(5_600_000));
-            assert_eq!(signable_order.order.expiration, U256::from(0));
-            assert_eq!(signable_order.order.nonce, U256::from(123));
-            assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-            assert_eq!(signable_order.order.side, Side::Sell as u8);
-            assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+            assert_eq!(signable_order.order().maker, client.address());
+            assert_eq!(signable_order.order().signer, client.address());
+            assert_eq!(signable_order.order().taker, Address::ZERO);
+            assert_eq!(signable_order.order().tokenId, token_1());
+            assert_eq!(signable_order.order().makerAmount, U256::from(100_000_000));
+            assert_eq!(signable_order.order().takerAmount, U256::from(5_600_000));
+            assert_eq!(signable_order.order().expiration, U256::from(0));
+            assert_eq!(signable_order.order().nonce, U256::from(123));
+            assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+            assert_eq!(signable_order.order().side, Side::Sell as u8);
+            assert_eq!(
+                signable_order.order().signatureType,
+                SignatureType::DepositWallet as u8
+            );
 
             Ok(())
         }
@@ -3057,29 +2997,31 @@ mod market {
                 .token_id(token_1())
                 .amount(Amount::shares(Decimal::ONE_HUNDRED)?)
                 .side(Side::Sell)
-                .nonce(123)
                 .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
                 .build()
                 .await?;
 
-            let maker_amount = signable_order.order.makerAmount;
-            let taker_amount = signable_order.order.takerAmount;
+            let maker_amount = signable_order.order().makerAmount;
+            let taker_amount = signable_order.order().takerAmount;
 
             let price = (to_decimal(taker_amount) / to_decimal(maker_amount))
                 .trunc_with_scale(USDC_DECIMALS);
             assert_eq!(price, dec!(0.0056));
 
-            assert_eq!(signable_order.order.maker, client.address());
-            assert_eq!(signable_order.order.signer, client.address());
-            assert_eq!(signable_order.order.taker, Address::ZERO);
-            assert_eq!(signable_order.order.tokenId, token_1());
-            assert_eq!(signable_order.order.makerAmount, U256::from(100_000_000));
-            assert_eq!(signable_order.order.takerAmount, U256::from(560_000));
-            assert_eq!(signable_order.order.expiration, U256::from(0));
-            assert_eq!(signable_order.order.nonce, U256::from(123));
-            assert_eq!(signable_order.order.feeRateBps, U256::ZERO);
-            assert_eq!(signable_order.order.side, Side::Sell as u8);
-            assert_eq!(signable_order.order.signatureType, SignatureType::Eoa as u8);
+            assert_eq!(signable_order.order().maker, client.address());
+            assert_eq!(signable_order.order().signer, client.address());
+            assert_eq!(signable_order.order().taker, Address::ZERO);
+            assert_eq!(signable_order.order().tokenId, token_1());
+            assert_eq!(signable_order.order().makerAmount, U256::from(100_000_000));
+            assert_eq!(signable_order.order().takerAmount, U256::from(560_000));
+            assert_eq!(signable_order.order().expiration, U256::from(0));
+            assert_eq!(signable_order.order().nonce, U256::from(123));
+            assert_eq!(signable_order.order().feeRateBps, U256::ZERO);
+            assert_eq!(signable_order.order().side, Side::Sell as u8);
+            assert_eq!(
+                signable_order.order().signatureType,
+                SignatureType::DepositWallet as u8
+            );
 
             Ok(())
         }

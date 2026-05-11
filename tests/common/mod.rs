@@ -50,6 +50,8 @@ pub const KUEST_BUILDER_TIMESTAMP: &str = "KUEST_BUILDER_TIMESTAMP";
 
 pub const API_KEY: Uuid = Uuid::nil();
 pub const BUILDER_API_KEY: Uuid = Uuid::max();
+pub const DEFAULT_FUNDER: alloy::primitives::Address =
+    alloy::primitives::address!("0xaDEFf2158d668f64308C62ef227C5CcaCAAf976D");
 
 pub const USDC_DECIMALS: u32 = 6;
 
@@ -92,6 +94,7 @@ pub async fn create_authenticated(server: &MockServer) -> anyhow::Result<TestCli
     let config = Config::builder().use_server_time(true).build();
     let client = Client::new(&server.base_url(), config)?
         .authentication_builder(&signer)
+        .funder(DEFAULT_FUNDER)
         .authenticate()
         .await?;
 

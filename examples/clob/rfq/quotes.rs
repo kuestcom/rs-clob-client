@@ -15,7 +15,7 @@
 //! LOG_FILE=rfq_quotes.log RUST_LOG=info,hyper_util=off,hyper=off,reqwest=off,h2=off,rustls=off cargo run --example rfq_quotes --features clob,rfq,tracing
 //! ```
 //!
-//! Requires `KUEST_PRIVATE_KEY` environment variable to be set.
+//! Requires `KUEST_PRIVATE_KEY` and `KUEST_DEPOSIT_WALLET` environment variables to be set.
 
 #![cfg(feature = "rfq")]
 
@@ -50,9 +50,13 @@ async fn main() -> anyhow::Result<()> {
 
     let private_key = std::env::var(PRIVATE_KEY_VAR).expect("Need KUEST_PRIVATE_KEY");
     let signer = LocalSigner::from_str(&private_key)?.with_chain_id(Some(POLYGON));
+    let funder = std::env::var("KUEST_DEPOSIT_WALLET")
+        .expect("Need KUEST_DEPOSIT_WALLET")
+        .parse()?;
 
     let client = Client::new("https://clob.kuest.com", Config::default())?
         .authentication_builder(&signer)
+        .funder(funder)
         .authenticate()
         .await?;
 

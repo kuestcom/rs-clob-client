@@ -16,17 +16,16 @@
 //! LOG_FILE=builder_authenticated.log RUST_LOG=info,hyper_util=off,hyper=off,reqwest=off,h2=off,rustls=off cargo run --example builder_authenticated --features clob,tracing
 //! ```
 //!
-//! Requires `KUEST_PRIVATE_KEY` environment variable to be set.
+//! Requires `KUEST_PRIVATE_KEY` and `KUEST_DEPOSIT_WALLET` environment variables to be set.
 
 use std::fs::File;
 use std::str::FromStr as _;
 
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
-use kuest_client_sdk::auth::builder::Config as BuilderConfig;
 use kuest_client_sdk::clob::types::request::TradesRequest;
 use kuest_client_sdk::clob::{Client, Config};
-use kuest_client_sdk::types::U256;
+use kuest_client_sdk::types::{B256, U256};
 use kuest_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
@@ -51,25 +50,26 @@ async fn main() -> anyhow::Result<()> {
 
     let private_key = std::env::var(PRIVATE_KEY_VAR).expect("Need KUEST_PRIVATE_KEY");
     let signer = LocalSigner::from_str(&private_key)?.with_chain_id(Some(POLYGON));
+    let funder = std::env::var("KUEST_DEPOSIT_WALLET")
+        .expect("Need KUEST_DEPOSIT_WALLET")
+        .parse()?;
 
     let client = Client::new("https://clob.kuest.com", Config::default())?
         .authentication_builder(&signer)
+        .funder(funder)
         .authenticate()
         .await?;
 
     // Create builder credentials and promote to builder client
-    let builder_credentials = client.create_builder_api_key().await?;
+    let _builder_credentials = client.create_builder_api_key().await?;
     info!(
         endpoint = "create_builder_api_key",
         "created builder credentials"
     );
 
-    let config = BuilderConfig::local(builder_credentials);
-    let client = client.promote_to_builder(config).await?;
-    info!(
-        endpoint = "promote_to_builder",
-        "promoted to builder client"
-    );
+    let mut builder_code_bytes = [0_u8; 32];
+    builder_code_bytes[12..].copy_from_slice(signer.address().as_slice());
+    let builder_code = B256::from(builder_code_bytes);
 
     match client.builder_api_keys().await {
         Ok(keys) => info!(endpoint = "builder_api_keys", count = keys.len()),
@@ -81,11 +81,13 @@ async fn main() -> anyhow::Result<()> {
     )?;
     let request = TradesRequest::builder().asset_id(token_id).build();
 
-    match client.builder_trades(&request, None).await {
+    match client.builder_trades(builder_code, &request, None).await {
         Ok(trades) => {
-            info!(endpoint = "builder_trades", token_id = %token_id, count = trades.data.len());
+            info!(endpoint = "builder_trades", builder_code = %builder_code, token_id = %token_id, count = trades.data.len());
         }
-        Err(e) => error!(endpoint = "builder_trades", token_id = %token_id, error = %e),
+        Err(e) => {
+            error!(endpoint = "builder_trades", builder_code = %builder_code, token_id = %token_id, error = %e)
+        }
     }
 
     Ok(())

@@ -1,7 +1,8 @@
 use std::marker::PhantomData;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use alloy::primitives::U256;
+use alloy::primitives::{B256, U256};
+use alloy::signers::Signer;
 use chrono::{DateTime, Utc};
 use rand::Rng as _;
 use rust_decimal::prelude::ToPrimitive as _;
@@ -11,32 +12,31 @@ use crate::auth::Kind as AuthKind;
 use crate::auth::state::Authenticated;
 use crate::clob::Client;
 use crate::clob::types::request::OrderBookSummaryRequest;
+use crate::clob::types::response::PostOrderResponse;
 use crate::clob::types::{
-    Amount, AmountInner, Order, OrderType, Side, SignableOrder, SignatureType,
+    Amount, AmountInner, OrderPayload, OrderType, OrderV2, Side, SignableOrder, SignatureType,
 };
+use crate::clob::utilities::USDC_DECIMALS;
 use crate::error::Error;
 use crate::types::{Address, Decimal};
-
-pub(crate) const USDC_DECIMALS: u32 = 6;
 
 /// Maximum number of decimal places for `size`
 pub(crate) const LOT_SIZE_SCALE: u32 = 2;
 
 /// Placeholder type for compile-time checks on limit order builders
 #[non_exhaustive]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Limit;
 
 /// Placeholder type for compile-time checks on market order builders
 #[non_exhaustive]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Market;
 
 /// Used to create an order iteratively and ensure validity with respect to its order kind.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct OrderBuilder<OrderKind, K: AuthKind> {
     pub(crate) client: Client<Authenticated<K>>,
-    pub(crate) signer: Address,
     pub(crate) signature_type: SignatureType,
     pub(crate) salt_generator: fn() -> u64,
     pub(crate) token_id: Option<U256>,
@@ -44,12 +44,14 @@ pub struct OrderBuilder<OrderKind, K: AuthKind> {
     pub(crate) size: Option<Decimal>,
     pub(crate) amount: Option<Amount>,
     pub(crate) side: Option<Side>,
-    pub(crate) nonce: Option<u64>,
     pub(crate) expiration: Option<DateTime<Utc>>,
-    pub(crate) taker: Option<Address>,
     pub(crate) order_type: Option<OrderType>,
     pub(crate) post_only: Option<bool>,
     pub(crate) funder: Option<Address>,
+    pub(crate) metadata: Option<B256>,
+    pub(crate) builder_code: Option<B256>,
+    pub(crate) defer_exec: Option<bool>,
+    pub(crate) user_usdc_balance: Option<Decimal>,
     pub(crate) _kind: PhantomData<OrderKind>,
 }
 
@@ -68,22 +70,9 @@ impl<OrderKind, K: AuthKind> OrderBuilder<OrderKind, K> {
         self
     }
 
-    /// Sets the nonce for this builder.
-    #[must_use]
-    pub fn nonce(mut self, nonce: u64) -> Self {
-        self.nonce = Some(nonce);
-        self
-    }
-
     #[must_use]
     pub fn expiration(mut self, expiration: DateTime<Utc>) -> Self {
         self.expiration = Some(expiration);
-        self
-    }
-
-    #[must_use]
-    pub fn taker(mut self, taker: Address) -> Self {
-        self.taker = Some(taker);
         self
     }
 
@@ -98,6 +87,70 @@ impl<OrderKind, K: AuthKind> OrderBuilder<OrderKind, K> {
     pub fn post_only(mut self, post_only: bool) -> Self {
         self.post_only = Some(post_only);
         self
+    }
+
+    /// Sets the metadata field (bytes32). Defaults to zero.
+    #[must_use]
+    pub fn metadata(mut self, metadata: B256) -> Self {
+        self.metadata = Some(metadata);
+        self
+    }
+
+    /// Sets the builder code for fee attribution (bytes32). Defaults to zero.
+    #[must_use]
+    pub fn builder_code(mut self, builder_code: B256) -> Self {
+        self.builder_code = Some(builder_code);
+        self
+    }
+
+    /// Sets the `deferExec` flag.
+    #[must_use]
+    pub fn defer_exec(mut self, defer_exec: bool) -> Self {
+        self.defer_exec = Some(defer_exec);
+        self
+    }
+
+    /// Assembles a V2 [`OrderPayload`].
+    async fn build_payload(
+        &self,
+        token_id: U256,
+        side: Side,
+        maker_amount: u128,
+        taker_amount: u128,
+        salt: u64,
+        expiration: U256,
+    ) -> Result<OrderPayload> {
+        let version = self.client.resolve_version(false).await?;
+        let maker = self.funder.ok_or_else(|| {
+            Error::validation("Deposit Wallet funder address is required for Kuest orders")
+        })?;
+
+        if version != 2 {
+            return Err(Error::validation(format!(
+                "unsupported CLOB protocol version for Kuest SDK: {version}"
+            )));
+        }
+
+        let timestamp_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time went backwards")
+            .as_millis();
+        Ok(OrderPayload::new(
+            OrderV2 {
+                salt: U256::from(salt),
+                maker,
+                signer: maker,
+                tokenId: token_id,
+                makerAmount: U256::from(maker_amount),
+                takerAmount: U256::from(taker_amount),
+                side: side as u8,
+                signatureType: self.signature_type as u8,
+                timestamp: U256::from(timestamp_ms),
+                metadata: self.metadata.unwrap_or(B256::ZERO),
+                builder: self.builder_code.unwrap_or(B256::ZERO),
+            },
+            expiration,
+        ))
     }
 }
 
@@ -117,6 +170,10 @@ impl<K: AuthKind> OrderBuilder<Limit, K> {
     }
 
     /// Validates and transforms this limit builder into a [`SignableOrder`]
+    ///
+    /// # Panics
+    ///
+    /// Panics if the system clock is before the Unix epoch.
     #[cfg_attr(
         feature = "tracing",
         tracing::instrument(skip(self), err(level = "warn"))
@@ -146,7 +203,6 @@ impl<K: AuthKind> OrderBuilder<Limit, K> {
             )));
         }
 
-        let fee_rate = self.client.fee_rate_bps(token_id).await?;
         let minimum_tick_size = self
             .client
             .tick_size(token_id)
@@ -190,10 +246,8 @@ impl<K: AuthKind> OrderBuilder<Limit, K> {
             )));
         }
 
-        let nonce = self.nonce.unwrap_or(0);
         let expiration = self.expiration.unwrap_or(DateTime::<Utc>::UNIX_EPOCH);
-        let taker = self.taker.unwrap_or(Address::ZERO);
-        let order_type = self.order_type.unwrap_or(OrderType::GTC);
+        let order_type = self.order_type.clone().unwrap_or(OrderType::GTC);
         let post_only = Some(self.post_only.unwrap_or(false));
 
         if !matches!(order_type, OrderType::GTD) && expiration > DateTime::<Utc>::UNIX_EPOCH {
@@ -208,15 +262,6 @@ impl<K: AuthKind> OrderBuilder<Limit, K> {
             ));
         }
 
-        // When buying `YES` tokens, the user will "make" `size` * `price` USDC and "take"
-        // `size` `YES` tokens, and vice versa for sells. We have to truncate the notional values
-        // to the combined precision of the tick size _and_ the lot size. This is to ensure that
-        // this order will "snap" to the precision of resting orders on the book. The returned
-        // values are quantized to `USDC_DECIMALS`.
-        //
-        // e.g. User submits a limit order to buy 100 `YES` tokens at $0.34.
-        // This means they will take/receive 100 `YES` tokens, make/give up 34 USDC. This means that
-        // the `taker_amount` is `100000000` and the `maker_amount` of `34000000`.
         let (taker_amount, maker_amount) = match side {
             Side::Buy => (
                 size,
@@ -230,32 +275,65 @@ impl<K: AuthKind> OrderBuilder<Limit, K> {
         };
 
         let salt = to_ieee_754_int((self.salt_generator)());
+        let expiration_u256 = U256::from(expiration.timestamp().to_u64().ok_or(
+            Error::validation(format!(
+                "Unable to represent expiration {expiration} as a u64"
+            )),
+        )?);
 
-        let order = Order {
-            salt: U256::from(salt),
-            maker: self.funder.unwrap_or(self.signer),
-            taker,
-            tokenId: token_id,
-            makerAmount: U256::from(to_fixed_u128(maker_amount)),
-            takerAmount: U256::from(to_fixed_u128(taker_amount)),
-            side: side as u8,
-            feeRateBps: U256::from(fee_rate.base_fee),
-            nonce: U256::from(nonce),
-            signer: self.signer,
-            expiration: U256::from(expiration.timestamp().to_u64().ok_or(Error::validation(
-                format!("Unable to represent expiration {expiration} as a u64"),
-            ))?),
-            signatureType: self.signature_type as u8,
-        };
+        let payload = self
+            .build_payload(
+                token_id,
+                side,
+                to_fixed_u128(maker_amount),
+                to_fixed_u128(taker_amount),
+                salt,
+                expiration_u256,
+            )
+            .await?;
 
         #[cfg(feature = "tracing")]
         tracing::debug!(token_id = %token_id, side = ?side, price = %price, size = %size, "limit order built");
 
         Ok(SignableOrder {
-            order,
+            payload,
             order_type,
             post_only,
+            defer_exec: self.defer_exec,
         })
+    }
+
+    /// Convenience: builds, signs, and posts this limit order in a single call.
+    ///
+    /// If the server rejects the order due to a version mismatch, this automatically retries
+    /// once with the updated version — rebuilding and re-signing the order from scratch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any of the build, sign, or post steps fails.
+    pub async fn build_sign_and_post<S: Signer>(self, signer: &S) -> Result<PostOrderResponse> {
+        let client = self.client.clone();
+        let before_version = client.resolve_version(false).await.unwrap_or(0);
+        let retry = self.clone();
+        let order = self.build().await?;
+        let signed = client.sign(signer, order).await?;
+        let result = client.post_order(signed).await;
+        if let Err(err) = &result {
+            if let Some(status) = err.downcast_ref::<crate::error::Status>() {
+                if status
+                    .message
+                    .contains(crate::clob::client::ORDER_VERSION_MISMATCH_ERROR)
+                {
+                    let after_version = client.resolve_version(false).await.unwrap_or(0);
+                    if after_version != before_version {
+                        let order = retry.build().await?;
+                        let signed = client.sign(signer, order).await?;
+                        return client.post_order(signed).await;
+                    }
+                }
+            }
+        }
+        result
     }
 }
 
@@ -271,6 +349,15 @@ impl<K: AuthKind> OrderBuilder<Market, K> {
     #[must_use]
     pub fn amount(mut self, amount: Amount) -> Self {
         self.amount = Some(amount);
+        self
+    }
+
+    /// Sets the user's USDC balance. When set on a BUY market order, `build()` shrinks
+    /// the USDC amount to cover platform + builder taker fees so the order stays within
+    /// the user's balance.
+    #[must_use]
+    pub fn user_usdc_balance(mut self, balance: Decimal) -> Self {
+        self.user_usdc_balance = Some(balance);
         self
     }
 
@@ -303,10 +390,10 @@ impl<K: AuthKind> OrderBuilder<Market, K> {
             ));
         }
 
-        let (levels, amount) = match side {
-            Side::Buy => (book.asks, amount.0),
+        let (levels, amount_inner) = match side {
+            Side::Buy => (&book.asks, amount.0),
             Side::Sell => match amount.0 {
-                a @ AmountInner::Shares(_) => (book.bids, a),
+                a @ AmountInner::Shares(_) => (&book.bids, a),
                 AmountInner::Usdc(_) => {
                     return Err(Error::validation(
                         "Sell Orders must specify their `amount`s in shares",
@@ -317,30 +404,34 @@ impl<K: AuthKind> OrderBuilder<Market, K> {
             side => return Err(Error::validation(format!("Invalid side: {side}"))),
         };
 
-        let first = levels.first().ok_or(Error::validation(format!(
-            "No opposing orders for {token_id} which means there is no market price"
-        )))?;
-
-        let mut sum = Decimal::ZERO;
-        let cutoff_price = levels.iter().rev().find_map(|level| {
-            match amount {
-                AmountInner::Usdc(_) => sum += level.size * level.price,
-                AmountInner::Shares(_) => sum += level.size,
-            }
-            (sum >= amount.as_inner()).then_some(level.price)
-        });
-
-        match cutoff_price {
-            Some(price) => Ok(price),
-            None if matches!(order_type, OrderType::FOK) => Err(Error::validation(format!(
-                "Insufficient liquidity to fill order for {token_id} at {}",
-                amount.as_inner()
-            ))),
-            None => Ok(first.price),
+        if levels.is_empty() {
+            return Err(Error::validation(format!(
+                "No opposing orders for {token_id} which means there is no market price"
+            )));
         }
+
+        let target = amount_inner.as_inner();
+        let cutoff_price = match amount_inner {
+            AmountInner::Usdc(_) => {
+                super::utilities::walk_levels(levels, target, |l| l.size * l.price, &order_type)
+            }
+            AmountInner::Shares(_) => {
+                super::utilities::walk_levels(levels, target, |l| l.size, &order_type)
+            }
+        };
+
+        cutoff_price.ok_or_else(|| {
+            Error::validation(format!(
+                "Insufficient liquidity to fill order for {token_id} at {target}"
+            ))
+        })
     }
 
     /// Validates and transforms this market builder into a [`SignableOrder`]
+    ///
+    /// # Panics
+    ///
+    /// Panics if the system clock is before the Unix epoch.
     #[cfg_attr(
         feature = "tracing",
         tracing::instrument(skip(self), err(level = "warn"))
@@ -362,9 +453,6 @@ impl<K: AuthKind> OrderBuilder<Market, K> {
             .amount
             .ok_or_else(|| Error::validation("Unable to build Order due to missing amount"))?;
 
-        let nonce = self.nonce.unwrap_or(0);
-        let taker = self.taker.unwrap_or(Address::ZERO);
-
         let order_type = self.order_type.clone().unwrap_or(OrderType::FAK);
         let post_only = self.post_only;
         if post_only == Some(true) {
@@ -372,6 +460,7 @@ impl<K: AuthKind> OrderBuilder<Market, K> {
                 "postOnly is only supported for limit orders",
             ));
         }
+
         let price = match self.price {
             Some(price) => price,
             None => self.calculate_price(order_type.clone()).await?,
@@ -383,7 +472,6 @@ impl<K: AuthKind> OrderBuilder<Market, K> {
             .await?
             .minimum_tick_size
             .as_decimal();
-        let fee_rate = self.client.fee_rate_bps(token_id).await?;
 
         let decimals = minimum_tick_size.scale();
 
@@ -395,77 +483,112 @@ impl<K: AuthKind> OrderBuilder<Market, K> {
             )));
         }
 
-        // When buying `YES` tokens, the user will "make" `USDC` dollars and "take"
-        // `USDC` / `price` `YES` tokens. When selling `YES` tokens, the user will "make" `YES`
-        // token shares, and "take" `YES` shares * `price`. We have to truncate the notional values
-        // to the combined precision of the tick size _and_ the lot size. This is to ensure that
-        // this order will "snap" to the precision of resting orders on the book. The returned
-        // values are quantized to `USDC_DECIMALS`.
-        //
-        // e.g. User submits a market order to buy $100 worth of `YES` tokens at
-        // the current `market_price` of $0.34. This means they will take/receive (100/0.34)
-        // 294.1176(47) `YES` tokens, make/give up $100. This means that the `taker_amount` is
-        // `294117600` and the `maker_amount` of `100000000`.
-        //
-        // e.g. User submits a market order to sell 100 `YES` tokens at the current
-        // `market_price` of $0.34. This means that they will take/receive $34, make/give up 100
-        // `YES` tokens. This means that the `taker_amount` is `34000000` and the `maker_amount` is
-        // `100000000`.
+        let amount = match (side, amount.0, self.user_usdc_balance) {
+            (Side::Buy, AmountInner::Usdc(raw), Some(balance)) => {
+                // V2 uses `/clob-markets/{id}` `fd` (rate + exponent); `/fee-rate`
+                // only exposes V1 bps and would silently mis-size V2 orders.
+                let fee = self.client.fee_info(token_id).await?;
+                let fee_rate = fee.rate;
+                let fee_exponent = Decimal::from(fee.exponent);
+                let builder_taker_fee = match self.builder_code {
+                    Some(code) if code != B256::ZERO => {
+                        let rate = self.client.builder_fee_rate(code).await?;
+                        Decimal::from(rate.builder_taker_fee_rate_bps) / Decimal::from(10_000_u32)
+                    }
+                    _ => Decimal::ZERO,
+                };
+
+                let adjusted = super::utilities::adjust_market_buy_amount(
+                    raw,
+                    balance,
+                    price,
+                    fee_rate,
+                    fee_exponent,
+                    builder_taker_fee,
+                )?;
+                Amount::usdc(adjusted)?
+            }
+            _ => amount,
+        };
+
         let raw_amount = amount.as_inner();
 
         let (taker_amount, maker_amount) = match (side, amount.0) {
-            // Spend USDC to buy shares
             (Side::Buy, AmountInner::Usdc(_)) => {
                 let shares = (raw_amount / price).trunc_with_scale(decimals + LOT_SIZE_SCALE);
                 (shares, raw_amount)
             }
-
-            // Buy N shares: use cutoff `price` derived from ask depth
             (Side::Buy, AmountInner::Shares(_)) => {
                 let usdc = (raw_amount * price).trunc_with_scale(decimals + LOT_SIZE_SCALE);
                 (raw_amount, usdc)
             }
-
-            // Sell N shares for USDC
             (Side::Sell, AmountInner::Shares(_)) => {
                 let usdc = (raw_amount * price).trunc_with_scale(decimals + LOT_SIZE_SCALE);
                 (usdc, raw_amount)
             }
-
             (Side::Sell, AmountInner::Usdc(_)) => {
                 return Err(Error::validation(
                     "Sell Orders must specify their `amount`s in shares",
                 ));
             }
-
             (side, _) => return Err(Error::validation(format!("Invalid side: {side}"))),
         };
 
         let salt = to_ieee_754_int((self.salt_generator)());
 
-        let order = Order {
-            salt: U256::from(salt),
-            maker: self.funder.unwrap_or(self.signer),
-            taker,
-            tokenId: token_id,
-            makerAmount: U256::from(to_fixed_u128(maker_amount)),
-            takerAmount: U256::from(to_fixed_u128(taker_amount)),
-            side: side as u8,
-            feeRateBps: U256::from(fee_rate.base_fee),
-            nonce: U256::from(nonce),
-            signer: self.signer,
-            expiration: U256::ZERO,
-            signatureType: self.signature_type as u8,
-        };
+        let payload = self
+            .build_payload(
+                token_id,
+                side,
+                to_fixed_u128(maker_amount),
+                to_fixed_u128(taker_amount),
+                salt,
+                U256::ZERO,
+            )
+            .await?;
 
         #[cfg(feature = "tracing")]
         tracing::debug!(token_id = %token_id, side = ?side, price = %price, amount = %amount.as_inner(), "market order built");
 
         Ok(SignableOrder {
-            order,
+            payload,
             order_type,
             post_only: None,
+            defer_exec: self.defer_exec,
         })
+    }
+
+    /// Convenience: builds, signs, and posts this market order in a single call.
+    ///
+    /// If the server rejects the order due to a version mismatch, this automatically retries
+    /// once with the updated version — rebuilding and re-signing the order from scratch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any of the build, sign, or post steps fails.
+    pub async fn build_sign_and_post<S: Signer>(self, signer: &S) -> Result<PostOrderResponse> {
+        let client = self.client.clone();
+        let before_version = client.resolve_version(false).await.unwrap_or(0);
+        let retry = self.clone();
+        let order = self.build().await?;
+        let signed = client.sign(signer, order).await?;
+        let result = client.post_order(signed).await;
+        if let Err(err) = &result {
+            if let Some(status) = err.downcast_ref::<crate::error::Status>() {
+                if status
+                    .message
+                    .contains(crate::clob::client::ORDER_VERSION_MISMATCH_ERROR)
+                {
+                    let after_version = client.resolve_version(false).await.unwrap_or(0);
+                    if after_version != before_version {
+                        let order = retry.build().await?;
+                        let signed = client.sign(signer, order).await?;
+                        return client.post_order(signed).await;
+                    }
+                }
+            }
+        }
+        result
     }
 }
 
@@ -479,9 +602,13 @@ fn to_fixed_u128(d: Decimal) -> u128 {
         .expect("The `build` call in `OrderBuilder<S, OrderKind, K>` ensures that only positive values are being multiplied/divided")
 }
 
-/// Mask the salt to be <= 2^53 - 1, as the backend parses as an IEEE 754.
-fn to_ieee_754_int(salt: u64) -> u64 {
-    salt & ((1 << 53) - 1)
+/// `Number.MAX_SAFE_INTEGER` (2^53 − 1). The CLOB backend deserializes the order's
+/// uniqueness nonce as a JSON number; values above this bound lose precision in
+/// JavaScript. Not a cryptographic constant — the nonce is not security-sensitive.
+const JS_SAFE_INTEGER_MAX: u64 = (1 << 53) - 1;
+
+fn to_ieee_754_int(value: u64) -> u64 {
+    value & JS_SAFE_INTEGER_MAX
 }
 
 #[must_use]

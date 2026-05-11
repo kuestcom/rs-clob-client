@@ -1509,7 +1509,7 @@ mod authenticated {
         let client = Client::new(&server.base_url(), config)?
             .authentication_builder(&signer)
             .funder(funder)
-            .signature_type(SignatureType::Proxy)
+            .signature_type(SignatureType::DepositWallet)
             .salt_generator(|| 1) // To ensure determinism
             .authenticate()
             .await?;
@@ -1554,7 +1554,10 @@ mod authenticated {
         assert_eq!(signed_order.order.taker, taker);
         assert_eq!(signed_order.order.maker, funder);
         assert_ne!(signed_order.order.maker, client.address());
-        assert_eq!(signed_order.order.signatureType, SignatureType::Proxy as u8);
+        assert_eq!(
+            signed_order.order.signatureType,
+            SignatureType::DepositWallet as u8
+        );
         assert_eq!(signed_order.order.nonce, U256::from(2));
         assert_eq!(signed_order.order.salt, U256::from(1));
         assert_eq!(
@@ -2114,7 +2117,7 @@ mod authenticated {
                 .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
                 .header(KUEST_API_KEY, API_KEY)
                 .header(KUEST_PASSPHRASE, PASSPHRASE)
-                .query_param("signature_type", (SignatureType::Eoa as u8).to_string());
+                .query_param("signature_type", (SignatureType::DepositWallet as u8).to_string());
             then.status(StatusCode::OK).json_body(json!([
                 {
                     "type": 1,
@@ -2349,7 +2352,7 @@ mod authenticated {
                 .header(KUEST_API_KEY, API_KEY)
                 .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .query_param("date", date.to_string())
-                .query_param("signature_type", (SignatureType::Eoa as u8).to_string());
+                .query_param("signature_type", (SignatureType::DepositWallet as u8).to_string());
             then.status(StatusCode::OK).json_body(json!({
                 "data": [{
                     "date": "2025-12-08",
@@ -2404,7 +2407,10 @@ mod authenticated {
                 .header(KUEST_API_KEY, API_KEY)
                 .header(KUEST_PASSPHRASE, PASSPHRASE)
                 .query_param("date", date.to_string())
-                .query_param("signature_type", (SignatureType::Eoa as u8).to_string());
+                .query_param(
+                    "signature_type",
+                    (SignatureType::DepositWallet as u8).to_string(),
+                );
             then.status(StatusCode::OK).json_body(json!([{
                 "date": "2025-12-08",
                 "asset_address": "0x0000000000000000000000000000000000000001",
@@ -2448,7 +2454,7 @@ mod authenticated {
                 .query_param("order_by", "")
                 .query_param("position", "")
                 .query_param("no_competition", "false")
-                .query_param("signature_type", (SignatureType::Eoa as u8).to_string());
+                .query_param("signature_type", (SignatureType::DepositWallet as u8).to_string());
             then.status(StatusCode::OK).json_body(json!(
                 [
                     {

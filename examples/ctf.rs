@@ -104,7 +104,7 @@ async fn main() -> Result<()> {
 
     // Example: Calculate position IDs (ERC1155 token IDs)
     info!("--- Calculating Position IDs ---");
-    let usdc = address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174");
+    let usdc = address!("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359");
 
     let yes_position_req = PositionIdRequest::builder()
         .collateral_token(usdc)

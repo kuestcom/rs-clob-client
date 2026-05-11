@@ -55,7 +55,7 @@ mod request {
             .asset_out(Asset::Usdc)
             .amount_in(dec!(50000000))
             .amount_out(dec!(3000000))
-            .user_type(SignatureType::Eoa)
+            .user_type(SignatureType::DepositWallet)
             .build();
 
         let response = client.create_request(&request).await?;
@@ -199,7 +199,7 @@ mod quote {
             .asset_out(Asset::Asset(U256::from_str("12345")?))
             .amount_in(dec!(3000000))
             .amount_out(dec!(50000000))
-            .user_type(SignatureType::Eoa)
+            .user_type(SignatureType::DepositWallet)
             .build();
 
         let response = client.create_quote(&request).await?;
@@ -393,7 +393,7 @@ mod error_handling {
             .asset_out(Asset::Usdc)
             .amount_in(dec!(50000000))
             .amount_out(dec!(3000000))
-            .user_type(SignatureType::Eoa)
+            .user_type(SignatureType::DepositWallet)
             .build();
 
         let result = client.create_request(&request).await;

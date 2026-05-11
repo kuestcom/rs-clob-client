@@ -66,6 +66,7 @@ serde_path_to_error = { version = "0.1", optional = true }
 serde_repr = "0.1.20"
 serde_with = { version = "3.16.1", features = ["chrono_0_4", "json"] }
 sha2 = "0.10.9"
+sha1 = "0.10.6"
 strum_macros = "0.27.2"
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros"], optional = true }
 tokio-tungstenite = { version = "0.28.0", features = ["rustls-tls-native-roots"], optional = true }
@@ -94,22 +95,22 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 [[example]]
 name = "async"
 path = "examples/clob/async.rs"
-required-features = ["clob"]
+required-features = ["clob", "tracing"]
 
 [[example]]
 name = "authenticated"
 path = "examples/clob/authenticated.rs"
-required-features = ["clob"]
+required-features = ["clob", "tracing"]
 
 [[example]]
 name = "aws_authenticated"
 path = "examples/clob/aws_authenticated.rs"
-required-features = ["clob"]
+required-features = ["clob", "tracing"]
 
 [[example]]
 name = "builder_authenticated"
 path = "examples/clob/builder_authenticated.rs"
-required-features = ["clob"]
+required-features = ["clob", "tracing"]
 
 [[example]]
 name = "heartbeats"
