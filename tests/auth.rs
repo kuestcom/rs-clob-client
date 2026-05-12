@@ -15,8 +15,7 @@ use reqwest::StatusCode;
 use serde_json::json;
 
 use crate::common::{
-    API_KEY, DEFAULT_FUNDER, KUEST_ADDRESS, PASSPHRASE, PRIVATE_KEY, SECRET,
-    create_authenticated,
+    API_KEY, DEFAULT_FUNDER, KUEST_ADDRESS, PASSPHRASE, PRIVATE_KEY, SECRET, create_authenticated,
 };
 
 #[tokio::test]
