@@ -106,6 +106,12 @@ pub async fn create_authenticated(server: &MockServer) -> anyhow::Result<TestCli
 
 pub fn ensure_requirements(server: &MockServer, token_id: U256, tick_size: TickSize) {
     server.mock(|when, then| {
+        when.method(httpmock::Method::GET).path("/version");
+        then.status(StatusCode::OK)
+            .json_body(json!({ "version": 2 }));
+    });
+
+    server.mock(|when, then| {
         when.method(httpmock::Method::GET).path("/neg-risk");
         then.status(StatusCode::OK)
             .json_body(json!({ "neg_risk": false }));
