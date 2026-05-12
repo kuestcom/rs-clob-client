@@ -7,7 +7,7 @@ pub use alloy::signers::Signer;
 pub use alloy::signers::local::LocalSigner;
 use async_trait::async_trait;
 use base64::Engine as _;
-use base64::engine::general_purpose::URL_SAFE;
+use base64::engine::general_purpose::{STANDARD, URL_SAFE};
 use hmac::{Hmac, Mac as _};
 use reqwest::header::HeaderMap;
 use reqwest::{Body, Request};
@@ -412,12 +412,33 @@ fn body_to_string(body: &Body) -> Option<String> {
 }
 
 fn hmac(secret: &SecretString, message: &str) -> Result<String> {
-    let decoded_secret = URL_SAFE.decode(secret.expose_secret())?;
+    let decoded_secret = decode_secret(secret.expose_secret())?;
     let mut mac = Hmac::<Sha256>::new_from_slice(&decoded_secret)?;
     mac.update(message.as_bytes());
 
     let result = mac.finalize().into_bytes();
     Ok(URL_SAFE.encode(result))
+}
+
+fn decode_secret(secret: &str) -> Result<Vec<u8>> {
+    let trimmed = secret.trim();
+    if let Ok(bytes) = URL_SAFE.decode(trimmed) {
+        return Ok(bytes);
+    }
+    if let Ok(bytes) = STANDARD.decode(trimmed) {
+        return Ok(bytes);
+    }
+
+    let mut padded = trimmed.to_owned();
+    let rem = padded.len() % 4;
+    if rem != 0 {
+        padded.push_str(&"=".repeat(4 - rem));
+    }
+
+    URL_SAFE
+        .decode(&padded)
+        .or_else(|_| STANDARD.decode(&padded))
+        .map_err(Into::into)
 }
 
 #[cfg(test)]
@@ -580,6 +601,15 @@ mod tests {
 
         assert_eq!(message, r#"1000000test-sign/orders{"hash":"0x123"}"#);
         assert_eq!(signature, "4gJVbox-R6XlDK4nlaicig0_ANVL1qdcahiL8CXfXLM=");
+
+        Ok(())
+    }
+
+    #[test]
+    fn hmac_accepts_standard_base64_secret() -> Result<()> {
+        let signature = hmac(&SecretString::from("+/8=".to_owned()), "message")?;
+
+        assert!(!signature.is_empty());
 
         Ok(())
     }

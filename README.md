@@ -13,7 +13,7 @@ Rust SDK for the Kuest CLOB.
 
 ```toml
 [dependencies]
-kuest-client-sdk = "2.0.0"
+kuest-client-sdk = "2.0.1"
 ```
 
 ## Read-Only Client
