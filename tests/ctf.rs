@@ -99,7 +99,7 @@ mod contract_calls {
             }));
         });
 
-        let usdc = address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174");
+        let usdc = address!("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359");
 
         let request = PositionIdRequest::builder()
             .collateral_token(usdc)
@@ -179,7 +179,7 @@ mod request_builders {
     #[test]
     fn split_position_request_builder() {
         let request = SplitPositionRequest::builder()
-            .collateral_token(address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"))
+            .collateral_token(address!("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"))
             .condition_id(B256::ZERO)
             .partition(vec![U256::from(1), U256::from(2)])
             .amount(U256::from(1_000_000))
@@ -187,7 +187,7 @@ mod request_builders {
 
         assert_eq!(
             request.collateral_token,
-            address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174")
+            address!("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359")
         );
         assert_eq!(request.parent_collection_id, B256::ZERO);
         assert_eq!(request.amount, U256::from(1_000_000));
@@ -196,7 +196,7 @@ mod request_builders {
     #[test]
     fn merge_positions_request_builder() {
         let request = MergePositionsRequest::builder()
-            .collateral_token(address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"))
+            .collateral_token(address!("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"))
             .condition_id(B256::ZERO)
             .partition(vec![U256::from(1), U256::from(2)])
             .amount(U256::from(1_000_000))
@@ -209,7 +209,7 @@ mod request_builders {
     #[test]
     fn redeem_positions_request_builder() {
         let request = RedeemPositionsRequest::builder()
-            .collateral_token(address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"))
+            .collateral_token(address!("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"))
             .condition_id(B256::ZERO)
             .index_sets(vec![U256::from(1)])
             .build();
@@ -228,7 +228,7 @@ mod binary_market_convenience_methods {
 
     #[test]
     fn split_position_for_binary_market() {
-        let usdc = address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174");
+        let usdc = address!("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359");
         let condition_id = B256::ZERO;
 
         let request =
@@ -243,7 +243,7 @@ mod binary_market_convenience_methods {
 
     #[test]
     fn merge_positions_for_binary_market() {
-        let usdc = address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174");
+        let usdc = address!("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359");
         let condition_id = B256::ZERO;
 
         let request =
@@ -257,7 +257,7 @@ mod binary_market_convenience_methods {
 
     #[test]
     fn redeem_positions_for_binary_market() {
-        let usdc = address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174");
+        let usdc = address!("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359");
         let condition_id = B256::ZERO;
 
         let request = RedeemPositionsRequest::for_binary_market(usdc, condition_id);

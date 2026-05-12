@@ -150,8 +150,8 @@ mod supported_assets {
                         "chainName": "Polygon",
                         "token": {
                             "name": "Bridged USDC",
-                            "symbol": "USDC.e",
-                            "address": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+                            "symbol": "USDC",
+                            "address": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
                             "decimals": 6
                         },
                         "minCheckoutUsd": 10.0
@@ -183,8 +183,8 @@ mod supported_assets {
                     .token(
                         Token::builder()
                             .name("Bridged USDC")
-                            .symbol("USDC.e")
-                            .address("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174")
+                            .symbol("USDC")
+                            .address("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359")
                             .decimals(6_u8)
                             .build(),
                     )
@@ -263,7 +263,7 @@ mod deposit_status {
                         "fromTokenAddress": "11111111111111111111111111111111",
                         "fromAmountBaseUnit": "13566635",
                         "toChainId": "137",
-                        "toTokenAddress": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+                        "toTokenAddress": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
                         "status": "COMPLETED",
                         "txHash": "3atr19NAiNCYt24RHM1WnzZp47RXskpTDzspJoCBBaMFwUB8fk37hFkxz35P5UEnnmWz21rb2t5wJ8pq3EE2XnxU",
                         "createdTimeMs": 1_757_646_914_535_u64,
@@ -274,7 +274,7 @@ mod deposit_status {
                         "fromTokenAddress": "11111111111111111111111111111111",
                         "fromAmountBaseUnit": "13_566_635",
                         "toChainId": "137",
-                        "toTokenAddress": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+                        "toTokenAddress": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
                         "status": "DEPOSIT_DETECTED",
 
                     }
@@ -294,7 +294,7 @@ mod deposit_status {
                     .from_token_address("11111111111111111111111111111111")
                     .from_amount_base_unit(U256::from(13_566_635))
                     .to_chain_id(137)
-                    .to_token_address(address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"))
+                    .to_token_address(address!("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"))
                     .status(DepositTransactionStatus::Completed)
                     .tx_hash("3atr19NAiNCYt24RHM1WnzZp47RXskpTDzspJoCBBaMFwUB8fk37hFkxz35P5UEnnmWz21rb2t5wJ8pq3EE2XnxU")
                     .created_time_ms(1_757_646_914_535)
@@ -304,7 +304,7 @@ mod deposit_status {
                     .from_token_address("11111111111111111111111111111111")
                     .from_amount_base_unit(U256::from(13_566_635))
                     .to_chain_id(137)
-                    .to_token_address(address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"))
+                    .to_token_address(address!("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"))
                     .status(DepositTransactionStatus::DepositDetected)
                     .build(),
             ])

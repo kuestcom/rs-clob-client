@@ -113,9 +113,18 @@ async fn authenticated() -> anyhow::Result<()> {
     };
 
     let signer = LocalSigner::from_str(&private_key)?.with_chain_id(Some(POLYGON));
+    let Ok(funder_raw) = std::env::var("KUEST_DEPOSIT_WALLET") else {
+        warn!(
+            stream = "trades",
+            "skipping authenticated stream - KUEST_DEPOSIT_WALLET not set"
+        );
+        return Ok(());
+    };
+    let funder = funder_raw.parse()?;
 
     let client = Client::new("https://clob.kuest.com", Config::default())?
         .authentication_builder(&signer)
+        .funder(funder)
         .authenticate()
         .await?;
 

@@ -126,9 +126,9 @@ pub struct CommentProfile {
     pub display_username_public: bool,
     /// User's display name
     pub name: String,
-    /// Proxy wallet address used for transactions
+    /// Wallet address used for transactions
     #[serde(rename = "proxyWallet", default)]
-    pub proxy_wallet: Option<Address>,
+    pub wallet: Option<Address>,
     /// Generated pseudonym for the user
     #[serde(default)]
     pub pseudonym: Option<String>,

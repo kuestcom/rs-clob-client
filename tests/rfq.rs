@@ -42,7 +42,7 @@ mod request {
                     "assetOut": "0",
                     "amountIn": "50000000",
                     "amountOut": "3000000",
-                    "userType": 0
+                    "userType": 3
                 }));
             then.status(StatusCode::OK).json_body(json!({
                 "requestId": "0196464a-a1fa-75e6-821e-31aa0794f7ad",
@@ -55,7 +55,7 @@ mod request {
             .asset_out(Asset::Usdc)
             .amount_in(dec!(50000000))
             .amount_out(dec!(3000000))
-            .user_type(SignatureType::Eoa)
+            .user_type(SignatureType::DepositWallet)
             .build();
 
         let response = client.create_request(&request).await?;
@@ -186,7 +186,7 @@ mod quote {
                     "assetOut": "12345",
                     "amountIn": "3000000",
                     "amountOut": "50000000",
-                    "userType": 0
+                    "userType": 3
                 }));
             then.status(StatusCode::OK).json_body(json!({
                 "quoteId": "0196f484-9fbd-74c1-bfc1-75ac21c1cf84"
@@ -199,7 +199,7 @@ mod quote {
             .asset_out(Asset::Asset(U256::from_str("12345")?))
             .amount_in(dec!(3000000))
             .amount_out(dec!(50000000))
-            .user_type(SignatureType::Eoa)
+            .user_type(SignatureType::DepositWallet)
             .build();
 
         let response = client.create_quote(&request).await?;
@@ -393,7 +393,7 @@ mod error_handling {
             .asset_out(Asset::Usdc)
             .amount_in(dec!(50000000))
             .amount_out(dec!(3000000))
-            .user_type(SignatureType::Eoa)
+            .user_type(SignatureType::DepositWallet)
             .build();
 
         let result = client.create_request(&request).await;

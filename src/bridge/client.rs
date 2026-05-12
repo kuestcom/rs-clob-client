@@ -20,7 +20,7 @@ fn is_disabled_host(host: &Url) -> bool {
 /// Client for the Kuest Bridge API.
 ///
 /// The Bridge API enables bridging assets from various chains (EVM, Solana, Bitcoin)
-/// to USDC.e on Polygon for trading on Kuest.
+/// to USDC on Polygon for trading on Kuest.
 ///
 /// # Example
 ///

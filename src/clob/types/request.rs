@@ -201,7 +201,7 @@ pub struct CreateRfqRequestRequest {
     pub amount_in: Decimal,
     /// Amount of asset to give (in base units).
     pub amount_out: Decimal,
-    /// Signature type (`EOA`, `Proxy`, or `GnosisSafe`).
+    /// Signature type. Kuest supports only Deposit Wallet type 3.
     pub user_type: SignatureType,
 }
 
@@ -275,7 +275,7 @@ pub struct CreateRfqQuoteRequest {
     pub amount_in: Decimal,
     /// Amount of asset to give (in base units).
     pub amount_out: Decimal,
-    /// Signature type (`EOA`, `Proxy`, or `GnosisSafe`).
+    /// Signature type. Kuest supports only Deposit Wallet type 3.
     pub user_type: SignatureType,
 }
 
@@ -377,12 +377,6 @@ pub struct AcceptRfqQuoteRequest {
     pub salt: String,
     /// Owner identifier.
     pub owner: ApiKey,
-    /// Site fee in basis points.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_bps: Option<u32>,
-    /// Site fee receiver.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_receiver: Option<String>,
 }
 
 /// Request body for approving an RFQ order.
@@ -426,12 +420,6 @@ pub struct ApproveRfqOrderRequest {
     pub salt: String,
     /// Owner identifier.
     pub owner: ApiKey,
-    /// Site fee in basis points.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_bps: Option<u32>,
-    /// Site fee receiver.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_receiver: Option<String>,
 }
 
 #[cfg(test)]
@@ -495,12 +483,12 @@ mod tests {
         let request = BalanceAllowanceRequest::builder()
             .asset_type(AssetType::Collateral)
             .token_id(U256::from(1))
-            .signature_type(SignatureType::Eoa)
+            .signature_type(SignatureType::DepositWallet)
             .build();
 
         assert_eq!(
             request.query_params(None),
-            "?asset_type=COLLATERAL&token_id=1&signature_type=0"
+            "?asset_type=COLLATERAL&token_id=1&signature_type=3"
         );
     }
 

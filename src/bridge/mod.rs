@@ -4,7 +4,7 @@
 //!
 //! This module provides a client for interacting with the Kuest Bridge API,
 //! which enables bridging assets from various chains (EVM, Solana, Bitcoin) to
-//! USDC.e on Polygon for trading on Kuest.
+//! USDC on Polygon for trading on Kuest.
 //!
 //! # Overview
 //!

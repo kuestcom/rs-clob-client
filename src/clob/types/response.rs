@@ -9,8 +9,8 @@ use bon::Builder;
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_with::{
-    DefaultOnError, DefaultOnNull, NoneAsEmptyString, TimestampMilliSeconds, TimestampSeconds,
-    TryFromInto, serde_as,
+    DefaultOnError, DefaultOnNull, DisplayFromStr, NoneAsEmptyString, TimestampMilliSeconds,
+    TimestampSeconds, TryFromInto, serde_as,
 };
 use sha2::{Digest as _, Sha256};
 use uuid::Uuid;
@@ -91,7 +91,7 @@ pub struct FeeRateResponse {
     pub base_fee: u32,
 }
 
-/// Response from the Kuest geoblock endpoint.
+/// Response from the Polymarket geoblock endpoint.
 ///
 /// This indicates whether the requesting IP address is blocked from placing orders
 /// due to geographic restrictions.
@@ -170,6 +170,21 @@ pub struct LastTradesPricesResponse {
     pub token_id: U256,
     pub price: Decimal,
     pub side: Side,
+}
+
+/// Response from `GET /markets-by-token/{token_id}`. This endpoint returns a minimal
+/// market descriptor — just the condition ID and the two outcome token IDs — not a full
+/// [`MarketResponse`]. Used to resolve `token_id -> condition_id` before fetching the
+/// full clob-market info.
+#[non_exhaustive]
+#[serde_as]
+#[derive(Debug, Clone, Deserialize, Builder, PartialEq)]
+pub struct MarketByTokenResponse {
+    pub condition_id: B256,
+    #[serde_as(as = "DisplayFromStr")]
+    pub primary_token_id: U256,
+    #[serde_as(as = "DisplayFromStr")]
+    pub secondary_token_id: U256,
 }
 
 #[expect(
@@ -704,6 +719,82 @@ pub struct Page<T> {
     pub count: u64,
 }
 
+#[non_exhaustive]
+#[derive(Clone, Debug, Deserialize, Builder, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadonlyApiKeyResponse {
+    pub api_key: String,
+}
+
+/// Cached V2 fee parameters keyed by token, sourced from `/clob-markets/{id}`'s `fd` field.
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct FeeInfo {
+    pub rate: Decimal,
+    pub exponent: u32,
+}
+
+/// Platform fee parameters for a V2 market. Applied as `rate × (price × (1 − price))^exponent`.
+#[non_exhaustive]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct FeeDetails {
+    #[serde(rename = "r", default)]
+    pub rate: Decimal,
+    #[serde(rename = "e", default)]
+    pub exponent: u32,
+    #[serde(rename = "to", default)]
+    pub taker_only: bool,
+}
+
+#[non_exhaustive]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ClobToken {
+    #[serde(rename = "t")]
+    pub token_id: U256,
+    #[serde(rename = "o")]
+    pub outcome: String,
+}
+
+/// Response from `GET /clob-markets/{condition_id}`. Uses the server's short wire
+/// keys (`c`, `t`, `mts`, …) renamed to ergonomic Rust names.
+#[non_exhaustive]
+#[serde_as]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ClobMarketInfoResponse {
+    #[serde(rename = "c")]
+    pub condition_id: B256,
+    #[serde(rename = "t", default)]
+    #[serde_as(deserialize_as = "DefaultOnNull")]
+    pub tokens: Vec<Option<ClobToken>>,
+    #[serde(rename = "mts")]
+    #[serde_as(as = "TryFromInto<Decimal>")]
+    pub min_tick_size: TickSize,
+    #[serde(rename = "mos", default)]
+    pub min_order_size: Decimal,
+    #[serde(rename = "nr", default)]
+    pub neg_risk: bool,
+    #[serde(rename = "fd", default)]
+    pub fee_details: Option<FeeDetails>,
+    /// Legacy V1 maker base fee. Unused in V2 settlement.
+    #[serde(rename = "mbf", default)]
+    pub maker_base_fee: Option<Decimal>,
+    /// Legacy V1 taker base fee. Unused in V2 settlement.
+    #[serde(rename = "tbf", default)]
+    pub taker_base_fee: Option<Decimal>,
+    #[serde(rename = "rfqe", default)]
+    pub rfq_enabled: bool,
+}
+
+#[non_exhaustive]
+#[derive(Clone, Debug, Deserialize, Builder, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BuilderFeeRateResponse {
+    #[serde(alias = "builder_maker_fee_rate_bps")]
+    pub builder_maker_fee_rate_bps: u32,
+    #[serde(alias = "builder_taker_fee_rate_bps")]
+    pub builder_taker_fee_rate_bps: u32,
+}
+
 /// Response from creating an RFQ request.
 #[cfg(feature = "rfq")]
 #[non_exhaustive]
@@ -758,8 +849,9 @@ pub struct RfqRequest {
     pub request_id: String,
     /// User's address.
     pub user_address: Address,
-    /// Proxy address (may be same as user).
-    pub proxy_address: Address,
+    /// Wallet address returned by the API.
+    #[serde(rename = "proxyAddress")]
+    pub wallet_address: Address,
     /// Market condition ID.
     pub condition: B256,
     /// Token ID for the outcome token.
@@ -791,8 +883,9 @@ pub struct RfqQuote {
     pub request_id: String,
     /// Quoter's address.
     pub user_address: Address,
-    /// Proxy address (may be same as user).
-    pub proxy_address: Address,
+    /// Wallet address returned by the API.
+    #[serde(rename = "proxyAddress")]
+    pub wallet_address: Address,
     /// Market condition ID.
     pub condition: B256,
     /// Token ID for the outcome token.

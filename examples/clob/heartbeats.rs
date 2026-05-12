@@ -18,6 +18,9 @@ async fn main() -> anyhow::Result<()> {
 
     let private_key = std::env::var(PRIVATE_KEY_VAR).expect("Need a private key");
     let signer = LocalSigner::from_str(&private_key)?.with_chain_id(Some(POLYGON));
+    let funder = std::env::var("KUEST_DEPOSIT_WALLET")
+        .expect("Need KUEST_DEPOSIT_WALLET")
+        .parse()?;
 
     let config = Config::builder()
         .use_server_time(true)
@@ -25,6 +28,7 @@ async fn main() -> anyhow::Result<()> {
         .build();
     let client = Client::new("https://clob.kuest.com", config)?
         .authentication_builder(&signer)
+        .funder(funder)
         .authenticate()
         .await?;
 

@@ -22,7 +22,6 @@ pub mod ws;
 use std::fmt::Write as _;
 
 use alloy::primitives::ChainId;
-use alloy::primitives::{B256, b256, keccak256};
 use phf::phf_map;
 #[cfg(any(
     feature = "bridge",
@@ -58,53 +57,37 @@ pub(crate) type Timestamp = i64;
 
 static CONFIG: phf::Map<ChainId, ContractConfig> = phf_map! {
     137_u64 => ContractConfig {
-        exchange: address!("0xB5592f7CccA122558D2201e190826276f3a661cb"),
-        collateral: address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"),
+        exchange: address!("0x4bB1871fdaE80331ce5fF87547b8ff886D1695a5"),
+        collateral: address!("0x3c499c542cef5e3811e1192ce70d8cc03d5c3359"),
         conditional_tokens: address!("0x4682048725865bf17067bd85fF518527A262A9C7"),
         neg_risk_adapter: None,
+        exchange_v2: Some(address!("0x4bB1871fdaE80331ce5fF87547b8ff886D1695a5")),
     },
     80002_u64 => ContractConfig {
-        exchange: address!("0xB5592f7CccA122558D2201e190826276f3a661cb"),
+        exchange: address!("0x4bB1871fdaE80331ce5fF87547b8ff886D1695a5"),
         collateral: address!("0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582"),
         conditional_tokens: address!("0x4682048725865bf17067bd85fF518527A262A9C7"),
         neg_risk_adapter: None,
+        exchange_v2: Some(address!("0x4bB1871fdaE80331ce5fF87547b8ff886D1695a5")),
     },
 };
 
 static NEG_RISK_CONFIG: phf::Map<ChainId, ContractConfig> = phf_map! {
     137_u64 => ContractConfig {
-        exchange: address!("0xef02d1Ea5B42432C4E99C2785d1a4020d2FB24F5"),
-        collateral: address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"),
+        exchange: address!("0xdb1E374a05130d7DE3F16677066553F225D2eE53"),
+        collateral: address!("0x3c499c542cef5e3811e1192ce70d8cc03d5c3359"),
         conditional_tokens: address!("0x4682048725865bf17067bd85fF518527A262A9C7"),
-        neg_risk_adapter: Some(address!("0x724259Fe88100FE18C134324C4853975FBDa4d76")),
+        neg_risk_adapter: Some(address!("0xd9416E904e1ab925ad72F03F6D6ce0Aa80fd2dC5")),
+        exchange_v2: Some(address!("0xdb1E374a05130d7DE3F16677066553F225D2eE53")),
     },
     80002_u64 => ContractConfig {
-        exchange: address!("0xef02d1Ea5B42432C4E99C2785d1a4020d2FB24F5"),
+        exchange: address!("0xdb1E374a05130d7DE3F16677066553F225D2eE53"),
         collateral: address!("0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582"),
         conditional_tokens: address!("0x4682048725865bf17067bd85fF518527A262A9C7"),
-        neg_risk_adapter: Some(address!("0x724259Fe88100FE18C134324C4853975FBDa4d76")),
+        neg_risk_adapter: Some(address!("0xd9416E904e1ab925ad72F03F6D6ce0Aa80fd2dC5")),
+        exchange_v2: Some(address!("0xdb1E374a05130d7DE3F16677066553F225D2eE53")),
     },
 };
-
-// Wallet contract configurations for CREATE2 address derivation
-static WALLET_CONFIG: phf::Map<ChainId, WalletContractConfig> = phf_map! {
-    137_u64 => WalletContractConfig {
-        proxy_factory: Some(address!("0xc70A03a24424d934D7bd7E43de48e2Dafcc0Fe02")),
-        safe_factory: address!("0x0202c1c426C77cEE55979e4fB3496288fAba8413"),
-    },
-    80002_u64 => WalletContractConfig {
-        proxy_factory: Some(address!("0xc70A03a24424d934D7bd7E43de48e2Dafcc0Fe02")),
-        safe_factory: address!("0x0202c1c426C77cEE55979e4fB3496288fAba8413"),
-    },
-};
-
-/// Init code hash for Kuest proxy wallet clones.
-const PROXY_INIT_CODE_HASH: B256 =
-    b256!("0x1f566e4d6fc92316ca3a8303965679f5ca265da52fec11f520dfd90ee773226f");
-
-/// Init code hash for Gnosis Safe wallets
-const SAFE_INIT_CODE_HASH: B256 =
-    b256!("0x61e47bf36784271f639db33bb53fdc7fc843765357f63277759b9bb2ffdadaff");
 
 /// Helper struct to group the relevant deployed contract addresses
 #[non_exhaustive]
@@ -116,16 +99,8 @@ pub struct ContractConfig {
     /// The Neg Risk Adapter contract address. Only present for neg-risk market configs.
     /// Users must approve this contract for token transfers to trade in neg-risk markets.
     pub neg_risk_adapter: Option<Address>,
-}
-
-/// Wallet contract configuration for CREATE2 address derivation
-#[non_exhaustive]
-#[derive(Debug)]
-pub struct WalletContractConfig {
-    /// Factory contract for Kuest proxy wallets (Magic/email wallets).
-    pub proxy_factory: Option<Address>,
-    /// Factory contract for Gnosis Safe wallets.
-    pub safe_factory: Address,
+    /// The V2 exchange contract address.
+    pub exchange_v2: Option<Address>,
 }
 
 /// Given a `chain_id` and `is_neg_risk`, return the relevant [`ContractConfig`]
@@ -136,61 +111,6 @@ pub fn contract_config(chain_id: ChainId, is_neg_risk: bool) -> Option<&'static 
     } else {
         CONFIG.get(&chain_id)
     }
-}
-
-/// Returns the wallet contract configuration for the given chain ID.
-#[must_use]
-pub fn wallet_contract_config(chain_id: ChainId) -> Option<&'static WalletContractConfig> {
-    WALLET_CONFIG.get(&chain_id)
-}
-
-/// Derives the Kuest proxy wallet address for an EOA using CREATE2.
-///
-/// This is the deterministic address of the proxy wallet clone
-/// that Kuest deploys for Magic/email wallet users.
-///
-/// # Arguments
-/// * `eoa_address` - The externally owned account (EOA) address
-/// * `chain_id` - The chain ID (e.g., 137 for Polygon mainnet)
-///
-/// # Returns
-/// * `Some(Address)` - The derived proxy wallet address
-/// * `None` - If the chain doesn't support proxy wallets or config is missing
-#[must_use]
-pub fn derive_proxy_wallet(eoa_address: Address, chain_id: ChainId) -> Option<Address> {
-    let config = wallet_contract_config(chain_id)?;
-    let factory = config.proxy_factory?;
-
-    // Salt is keccak256(encodePacked(address)) - address is 20 bytes, no padding
-    let salt = keccak256(eoa_address);
-
-    Some(factory.create2(salt, PROXY_INIT_CODE_HASH))
-}
-
-/// Derives the Gnosis Safe wallet address for an EOA using CREATE2.
-///
-/// This is the deterministic address of the 1-of-1 Gnosis Safe multisig
-/// that Kuest deploys for browser wallet users.
-///
-/// # Arguments
-/// * `eoa_address` - The externally owned account (EOA) address
-/// * `chain_id` - The chain ID (e.g., 137 for Polygon mainnet)
-///
-/// # Returns
-/// * `Some(Address)` - The derived Safe wallet address
-/// * `None` - If the chain config is missing
-#[must_use]
-pub fn derive_safe_wallet(eoa_address: Address, chain_id: ChainId) -> Option<Address> {
-    let config = wallet_contract_config(chain_id)?;
-    let factory = config.safe_factory;
-
-    // Salt is keccak256(encodeAbiParameters(address)) - address padded to 32 bytes
-    // ABI encoding pads address to 32 bytes (left-padded with zeros)
-    let mut padded = [0_u8; 32];
-    padded[12..].copy_from_slice(eoa_address.as_slice());
-    let salt = keccak256(padded);
-
-    Some(factory.create2(salt, SAFE_INIT_CODE_HASH))
 }
 
 /// Trait for converting request types to URL query parameters.
@@ -308,7 +228,7 @@ mod tests {
         let cfg = contract_config(AMOY, false).expect("missing config");
         assert_eq!(
             cfg.exchange,
-            address!("0xB5592f7CccA122558D2201e190826276f3a661cb")
+            address!("0x4bB1871fdaE80331ce5fF87547b8ff886D1695a5")
         );
     }
 
@@ -317,91 +237,7 @@ mod tests {
         let cfg = contract_config(AMOY, true).expect("missing config");
         assert_eq!(
             cfg.exchange,
-            address!("0xef02d1Ea5B42432C4E99C2785d1a4020d2FB24F5")
+            address!("0xdb1E374a05130d7DE3F16677066553F225D2eE53")
         );
-    }
-
-    #[test]
-    fn wallet_contract_config_polygon() {
-        let cfg = wallet_contract_config(POLYGON).expect("missing config");
-        assert_eq!(
-            cfg.proxy_factory,
-            Some(address!("0xc70A03a24424d934D7bd7E43de48e2Dafcc0Fe02"))
-        );
-        assert_eq!(
-            cfg.safe_factory,
-            address!("0x0202c1c426C77cEE55979e4fB3496288fAba8413")
-        );
-    }
-
-    #[test]
-    fn wallet_contract_config_amoy() {
-        let cfg = wallet_contract_config(AMOY).expect("missing config");
-        assert_eq!(
-            cfg.proxy_factory,
-            Some(address!("0xc70A03a24424d934D7bd7E43de48e2Dafcc0Fe02"))
-        );
-        assert_eq!(
-            cfg.safe_factory,
-            address!("0x0202c1c426C77cEE55979e4fB3496288fAba8413")
-        );
-    }
-
-    #[test]
-    fn derive_safe_wallet_polygon() {
-        // Test address: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 (Foundry/Anvil test key)
-        let eoa = address!("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
-        let safe_addr = derive_safe_wallet(eoa, POLYGON).expect("derivation failed");
-
-        // This is the deterministic Safe address for this EOA on Polygon
-        assert_eq!(
-            safe_addr,
-            address!("0xea318ffe79a999879e93f181e064cbc54ffb9d34")
-        );
-    }
-
-    #[test]
-    fn derive_proxy_wallet_polygon() {
-        // Test address: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 (Foundry/Anvil test key)
-        let eoa = address!("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
-        let proxy_addr = derive_proxy_wallet(eoa, POLYGON).expect("derivation failed");
-
-        // This is the deterministic Proxy address for this EOA on Polygon
-        assert_eq!(
-            proxy_addr,
-            address!("0xff31fe60a31c3475e8dc43144da7751ff8b4b490")
-        );
-    }
-
-    #[test]
-    fn derive_proxy_wallet_amoy() {
-        let eoa = address!("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
-        let proxy_addr = derive_proxy_wallet(eoa, AMOY).expect("derivation failed");
-
-        assert_eq!(
-            proxy_addr,
-            address!("0xff31fe60a31c3475e8dc43144da7751ff8b4b490")
-        );
-    }
-
-    #[test]
-    fn derive_safe_wallet_amoy() {
-        let eoa = address!("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
-        // Safe wallet derivation should work on Amoy
-        let safe_addr = derive_safe_wallet(eoa, AMOY).expect("derivation failed");
-
-        // Same Safe factory on both networks, so same derived address
-        assert_eq!(
-            safe_addr,
-            address!("0xea318ffe79a999879e93f181e064cbc54ffb9d34")
-        );
-    }
-
-    #[test]
-    fn derive_wallet_unsupported_chain() {
-        let eoa = address!("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
-        // Unsupported chain should return None
-        assert!(derive_proxy_wallet(eoa, 1).is_none());
-        assert!(derive_safe_wallet(eoa, 1).is_none());
     }
 }

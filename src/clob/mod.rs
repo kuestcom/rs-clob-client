@@ -15,12 +15,21 @@
 //! - **Authenticated**: Order placement/cancellation, balances, API keys, rewards
 //! - **Builder Authentication**: Special endpoints for market makers and builders
 //!
+//! ## Orders
+//!
+//! This SDK uses the V2 CTF Exchange contract. Order fields include:
+//! `timestamp`, `metadata` (bytes32), `builder` (bytes32 for fee attribution).
+//! EIP-712 domain version is `"2"`.
+//! Supports [`DepositWallet`](types::SignatureType::DepositWallet) signature type 3 for EIP-1271 Deposit Wallet orders.
+//! Supports `deferExec` on order submission to defer execution.
+//!
 //! ## Public Endpoints (No Authentication Required)
 //!
 //! | Endpoint | Description |
 //! |----------|-------------|
 //! | `/` | Health check - returns "OK" |
 //! | `/time` | Current server timestamp |
+//! | `/version` | API version (1 or 2) |
 //! | `/midpoint` | Mid-market price for a token |
 //! | `/midpoints` | Batch midpoint prices |
 //! | `/price` | Best bid or ask price |
@@ -40,7 +49,7 @@
 //! | `/sampling-markets` | Sampling program markets |
 //! | `/simplified-markets` | Markets with reduced detail |
 //! | `/sampling-simplified-markets` | Simplified sampling markets |
-//! | `/data/price-history` | Historical price data |
+//! | `/prices-history` | Historical price data |
 //! | `/geoblock` | Geographic restriction check |
 //!
 //! ## Authenticated Endpoints
@@ -103,16 +112,18 @@
 //! use alloy::signers::local::LocalSigner;
 //! use kuest_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
 //! use kuest_client_sdk::clob::{Client, Config};
-//! use kuest_client_sdk::clob::types::{Side, SignedOrder};
+//! use kuest_client_sdk::clob::types::Side;
 //! use kuest_client_sdk::types::{dec, Decimal, U256};
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create signer from private key
 //! let private_key = std::env::var(PRIVATE_KEY_VAR)?;
 //! let signer = LocalSigner::from_str(&private_key)?.with_chain_id(Some(POLYGON));
+//! let funder = std::env::var("KUEST_DEPOSIT_WALLET")?.parse()?;
 //!
 //! let client = Client::new("https://clob.kuest.com", Config::default())?
 //!     .authentication_builder(&signer)
+//!     .funder(funder)
 //!     .authenticate()
 //!     .await?;
 //!
@@ -145,8 +156,8 @@
 
 pub mod client;
 pub mod order_builder;
-pub(crate) mod site_config;
 pub mod types;
+pub mod utilities;
 #[cfg(feature = "ws")]
 pub mod ws;
 

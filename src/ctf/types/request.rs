@@ -134,7 +134,7 @@ impl SplitPositionRequest {
     /// # use kuest_client_sdk::types::address;
     /// # use alloy::primitives::{B256, U256};
     /// let request = SplitPositionRequest::for_binary_market(
-    ///     address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"), // USDC
+    ///     address!("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"), // USDC
     ///     B256::default(),
     ///     U256::from(1_000_000), // 1 USDC (6 decimals)
     /// );
@@ -163,7 +163,7 @@ impl MergePositionsRequest {
     /// # use kuest_client_sdk::types::address;
     /// # use alloy::primitives::{B256, U256};
     /// let request = MergePositionsRequest::for_binary_market(
-    ///     address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"), // USDC
+    ///     address!("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"), // USDC
     ///     B256::default(),
     ///     U256::from(1_000_000), // 1 full set
     /// );
@@ -192,7 +192,7 @@ impl RedeemPositionsRequest {
     /// # use kuest_client_sdk::types::address;
     /// # use alloy::primitives::{B256, U256};
     /// let request = RedeemPositionsRequest::for_binary_market(
-    ///     address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"), // USDC
+    ///     address!("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"), // USDC
     ///     B256::default(),
     /// );
     /// ```

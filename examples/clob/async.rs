@@ -15,7 +15,8 @@
 //! LOG_FILE=async.log RUST_LOG=info,hyper_util=off,hyper=off,reqwest=off,h2=off,rustls=off cargo run --example async --features clob,tracing
 //! ```
 //!
-//! For authenticated endpoints, set the `KUEST_PRIVATE_KEY` environment variable.
+//! For authenticated endpoints, set the `KUEST_PRIVATE_KEY` and `KUEST_DEPOSIT_WALLET`
+//! environment variables.
 
 use std::fs::File;
 use std::str::FromStr as _;
@@ -114,9 +115,18 @@ async fn authenticated() -> anyhow::Result<()> {
         return Ok(());
     };
     let signer = LocalSigner::from_str(&private_key)?.with_chain_id(Some(POLYGON));
+    let Ok(funder_raw) = std::env::var("KUEST_DEPOSIT_WALLET") else {
+        info!(
+            endpoint = "authenticated",
+            "skipped - KUEST_DEPOSIT_WALLET not set"
+        );
+        return Ok(());
+    };
+    let funder = funder_raw.parse()?;
 
     let client = Client::new("https://clob.kuest.com", Config::default())?
         .authentication_builder(&signer)
+        .funder(funder)
         .authenticate()
         .await?;
     let client_clone = client.clone();

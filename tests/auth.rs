@@ -15,7 +15,7 @@ use reqwest::StatusCode;
 use serde_json::json;
 
 use crate::common::{
-    API_KEY, KUEST_ADDRESS, PASSPHRASE, PRIVATE_KEY, SECRET, create_authenticated,
+    API_KEY, DEFAULT_FUNDER, KUEST_ADDRESS, PASSPHRASE, PRIVATE_KEY, SECRET, create_authenticated,
 };
 
 #[tokio::test]
@@ -25,6 +25,7 @@ async fn authenticate_with_explicit_credentials_should_succeed() -> anyhow::Resu
     let signer = LocalSigner::from_str(PRIVATE_KEY)?.with_chain_id(Some(POLYGON));
     let client = Client::new(&server.base_url(), Config::default())?
         .authentication_builder(&signer)
+        .funder(DEFAULT_FUNDER)
         .credentials(Credentials::default())
         .authenticate()
         .await?;
@@ -51,6 +52,7 @@ async fn authenticate_with_nonce_should_succeed() -> anyhow::Result<()> {
     let signer = LocalSigner::from_str(PRIVATE_KEY)?.with_chain_id(Some(POLYGON));
     let client = Client::new(&server.base_url(), Config::default())?
         .authentication_builder(&signer)
+        .funder(DEFAULT_FUNDER)
         .nonce(123)
         .authenticate()
         .await?;
@@ -69,6 +71,7 @@ async fn authenticate_with_explicit_credentials_and_nonce_should_fail() -> anyho
     let signer = LocalSigner::from_str(PRIVATE_KEY)?.with_chain_id(Some(POLYGON));
     let err = Client::new(&server.base_url(), Config::default())?
         .authentication_builder(&signer)
+        .funder(DEFAULT_FUNDER)
         .nonce(123)
         .credentials(Credentials::default())
         .authenticate()
