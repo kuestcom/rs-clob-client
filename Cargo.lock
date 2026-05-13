@@ -3038,7 +3038,7 @@ dependencies = [
 
 [[package]]
 name = "kuest-client-sdk"
-version = "2.0.1"
+version = "2.0.2"
 dependencies = [
  "alloy",
  "anyhow",

@@ -281,10 +281,40 @@ pub struct SimplifiedMarketResponse {
 }
 
 #[non_exhaustive]
-#[derive(Clone, Debug, Default, Deserialize, Builder, PartialEq)]
+#[derive(Clone, Debug, Default, Builder, PartialEq)]
 pub struct ApiKeysResponse {
-    #[serde(rename = "apiKeys")]
     keys: Option<Vec<ApiKey>>,
+}
+
+#[serde_as]
+#[derive(Deserialize)]
+struct ApiKeysResponseWrapped {
+    #[serde(rename = "apiKeys")]
+    #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
+    keys: Option<Vec<ApiKey>>,
+}
+
+#[serde_as]
+#[derive(Deserialize)]
+struct ApiKeysResponseBare(#[serde_as(as = "Vec<DisplayFromStr>")] Vec<ApiKey>);
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum ApiKeysResponseWire {
+    Wrapped(ApiKeysResponseWrapped),
+    Bare(ApiKeysResponseBare),
+}
+
+impl<'de> Deserialize<'de> for ApiKeysResponse {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(match ApiKeysResponseWire::deserialize(deserializer)? {
+            ApiKeysResponseWire::Wrapped(wrapped) => Self { keys: wrapped.keys },
+            ApiKeysResponseWire::Bare(keys) => Self { keys: Some(keys.0) },
+        })
+    }
 }
 
 #[non_exhaustive]

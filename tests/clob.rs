@@ -1432,7 +1432,32 @@ mod authenticated {
                 .header(KUEST_API_KEY, API_KEY)
                 .header(KUEST_PASSPHRASE, PASSPHRASE);
             then.status(StatusCode::OK)
-                .json_body(json!({"apiKeys": [API_KEY]}));
+                .json_body(json!({"apiKeys": [API_KEY.to_string()]}));
+        });
+
+        let response = client.api_keys().await?;
+
+        let expected = ApiKeysResponse::builder().keys(vec![API_KEY]).build();
+
+        assert_eq!(response, expected);
+        mock.assert();
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn api_keys_should_accept_bare_array_response() -> anyhow::Result<()> {
+        let server = MockServer::start();
+        let client = create_authenticated(&server).await?;
+
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/auth/api-keys")
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE);
+            then.status(StatusCode::OK)
+                .json_body(json!([API_KEY.to_string()]));
         });
 
         let response = client.api_keys().await?;
