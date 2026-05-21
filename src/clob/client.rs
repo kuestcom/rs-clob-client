@@ -29,6 +29,7 @@ use {tokio::sync::oneshot::Receiver, tokio::time, tokio_util::sync::Cancellation
 use crate::auth::state::{Authenticated, State, Unauthenticated};
 use crate::auth::{Credentials, Kind, Normal};
 use crate::clob::order_builder::{Limit, Market, OrderBuilder, generate_seed};
+use crate::clob::site_config;
 use crate::clob::types::request::{
     BalanceAllowanceRequest, CancelMarketOrderRequest, DeleteNotificationsRequest,
     LastTradePriceRequest, MidpointRequest, OrderBookSummaryRequest, OrdersRequest,
@@ -392,7 +393,7 @@ impl Default for Config {
         Self {
             use_server_time: false,
             geoblock_host: None,
-            builder_code: None,
+            builder_code: site_config::builder_code(),
             #[cfg(feature = "heartbeats")]
             heartbeat_interval: Duration::from_secs(5),
         }
@@ -1408,6 +1409,10 @@ impl Client<Unauthenticated> {
         headers.insert("Content-Type", HeaderValue::from_static("application/json"));
 
         let client = ReqwestClient::builder().default_headers(headers).build()?;
+        let config = Config {
+            builder_code: config.builder_code.or_else(site_config::builder_code),
+            ..config
+        };
 
         let geoblock_host = Url::parse(
             config
