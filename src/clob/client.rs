@@ -382,6 +382,9 @@ pub struct Config {
     /// Default builder code inherited by orders built via [`Client::limit_order`] or
     /// [`Client::market_order`] when not set on the order itself.
     builder_code: Option<B256>,
+    /// Default order metadata inherited by orders built via [`Client::limit_order`] or
+    /// [`Client::market_order`] when not set on the order itself.
+    order_metadata: Option<B256>,
     #[cfg(feature = "heartbeats")]
     #[builder(default = Duration::from_secs(5))]
     /// How often the [`Client`] will automatically submit heartbeats. The default is five (5) seconds.
@@ -394,6 +397,7 @@ impl Default for Config {
             use_server_time: false,
             geoblock_host: None,
             builder_code: site_config::builder_code(),
+            order_metadata: site_config::order_metadata(),
             #[cfg(feature = "heartbeats")]
             heartbeat_interval: Duration::from_secs(5),
         }
@@ -1411,6 +1415,7 @@ impl Client<Unauthenticated> {
         let client = ReqwestClient::builder().default_headers(headers).build()?;
         let config = Config {
             builder_code: config.builder_code.or_else(site_config::builder_code),
+            order_metadata: config.order_metadata.or_else(site_config::order_metadata),
             ..config
         };
 
@@ -2880,7 +2885,7 @@ impl<K: Kind> Client<Authenticated<K>> {
             expiration: None,
             order_type: None,
             post_only: Some(false),
-            metadata: None,
+            metadata: self.inner.config.order_metadata,
             builder_code: self.inner.config.builder_code,
             defer_exec: None,
             user_usdc_balance: None,
