@@ -36,18 +36,25 @@ Kuest trading uses Deposit Wallet orders only. Public order builders use `Signat
 ```rust,ignore
 use std::str::FromStr;
 
+use alloy::primitives::B256;
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
-use kuest_client_sdk::AMOY;
+use kuest_client_sdk::POLYGON;
 use kuest_client_sdk::clob::{Client, Config};
 use kuest_client_sdk::clob::types::SignatureType;
 use kuest_client_sdk::types::Address;
 
 # async fn run() -> anyhow::Result<()> {
-let signer = LocalSigner::from_str("<owner-private-key>")?.with_chain_id(Some(AMOY));
+let signer = LocalSigner::from_str("<owner-private-key>")?.with_chain_id(Some(POLYGON));
 let deposit_wallet = Address::from_str("<deposit-wallet-address>")?;
+let site_builder_code = std::env::var("SITE_BUILDER_CODE").ok();
 
-let client = Client::new("https://clob.kuest.com", Config::default())?
+let mut config = Config::builder().use_server_time(true);
+if let Some(builder_code) = site_builder_code.filter(|value| !value.trim().is_empty()) {
+    config = config.builder_code(B256::from_str(&builder_code)?);
+}
+
+let client = Client::new("https://clob.kuest.com", config.build())?
     .authentication_builder(&signer)
     .signature_type(SignatureType::DepositWallet)
     .funder(deposit_wallet)
