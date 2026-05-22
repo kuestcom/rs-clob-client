@@ -14,6 +14,8 @@ pub mod error;
 pub mod gamma;
 #[cfg(feature = "rtds")]
 pub mod rtds;
+#[cfg(any(feature = "clob", feature = "gamma"))]
+pub(crate) mod sdk_site_config;
 pub(crate) mod serde_helpers;
 pub mod types;
 #[cfg(any(feature = "ws", feature = "rtds"))]

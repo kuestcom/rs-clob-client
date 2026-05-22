@@ -19,12 +19,12 @@
 //!
 //! Tests are organized by API endpoint group:
 //! - `sports`: Teams, sports metadata, and market types
-//! - `tags`: Tag listing and lookup by ID/slug, related tags
+//! - `tags`: Tag listing and lookup by ID/slug, plus disabled legacy related-tags calls
 //! - `events`: Event listing and lookup by ID/slug, event tags
 //! - `markets`: Market listing and lookup by ID/slug, market tags
 //! - `series`: Series listing and lookup by ID
-//! - `comments`: Comment listing and lookup by ID/user address
-//! - `profiles`: Public profile lookup
+//! - `comments`: Disabled legacy comment endpoints
+//! - `profiles`: Disabled legacy public profile endpoint
 //! - `search`: Search across events, markets, and profiles
 //! - `health`: API health check
 
@@ -137,6 +137,7 @@ mod sports {
 
 mod tags {
     use httpmock::{Method::GET, MockServer};
+    use kuest_client_sdk::error::Kind;
     use kuest_client_sdk::gamma::{
         Client,
         types::request::{
@@ -239,118 +240,63 @@ mod tags {
     }
 
     #[tokio::test]
-    async fn related_tags_by_id_should_succeed() -> anyhow::Result<()> {
+    async fn related_tags_by_id_should_return_validation_error() -> anyhow::Result<()> {
         let server = MockServer::start();
         let client = Client::new(&server.base_url())?;
-
-        let mock = server.mock(|when, then| {
-            when.method(GET).path("/tags/42/related-tags");
-            then.status(StatusCode::OK).json_body(json!([
-                {
-                    "id": "1",
-                    "tagID": "42",
-                    "relatedTagID": "99",
-                    "rank": 1
-                }
-            ]));
-        });
 
         let request = RelatedTagsByIdRequest::builder().id("42").build();
-        let response = client.related_tags_by_id(&request).await?;
+        let error = client.related_tags_by_id(&request).await.unwrap_err();
 
-        assert_eq!(response.len(), 1);
-        assert_eq!(response[0].id, "1");
-        assert_eq!(response[0].tag_id, Some("42".to_owned()));
-        assert_eq!(response[0].related_tag_id, Some("99".to_owned()));
-        mock.assert();
+        assert_eq!(error.kind(), Kind::Validation);
+        assert!(error.to_string().contains("Legacy Gamma endpoint disabled"));
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn related_tags_by_slug_should_succeed() -> anyhow::Result<()> {
+    async fn related_tags_by_slug_should_return_validation_error() -> anyhow::Result<()> {
         let server = MockServer::start();
         let client = Client::new(&server.base_url())?;
-
-        let mock = server.mock(|when, then| {
-            when.method(GET).path("/tags/slug/politics/related-tags");
-            then.status(StatusCode::OK).json_body(json!([
-                {
-                    "id": "2",
-                    "tagID": "10",
-                    "relatedTagID": "20",
-                    "rank": 5
-                }
-            ]));
-        });
 
         let request = RelatedTagsBySlugRequest::builder().slug("politics").build();
-        let response = client.related_tags_by_slug(&request).await?;
+        let error = client.related_tags_by_slug(&request).await.unwrap_err();
 
-        assert_eq!(response.len(), 1);
-        assert_eq!(response[0].id, "2");
-        mock.assert();
+        assert_eq!(error.kind(), Kind::Validation);
+        assert!(error.to_string().contains("Legacy Gamma endpoint disabled"));
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn tags_related_to_tag_by_id_should_succeed() -> anyhow::Result<()> {
+    async fn tags_related_to_tag_by_id_should_return_validation_error() -> anyhow::Result<()> {
         let server = MockServer::start();
         let client = Client::new(&server.base_url())?;
-
-        let mock = server.mock(|when, then| {
-            when.method(GET).path("/tags/42/related-tags/tags");
-            then.status(StatusCode::OK).json_body(json!([
-                {
-                    "id": "99",
-                    "label": "Related Tag",
-                    "slug": "related-tag",
-                    "forceShow": false,
-                    "forceHide": false,
-                    "isCarousel": false
-                }
-            ]));
-        });
 
         let request = RelatedTagsByIdRequest::builder().id("42").build();
-        let response = client.tags_related_to_tag_by_id(&request).await?;
+        let error = client
+            .tags_related_to_tag_by_id(&request)
+            .await
+            .unwrap_err();
 
-        assert_eq!(response.len(), 1);
-        assert_eq!(response[0].id, "99");
-        assert_eq!(response[0].label, Some("Related Tag".to_owned()));
-        mock.assert();
+        assert_eq!(error.kind(), Kind::Validation);
+        assert!(error.to_string().contains("Legacy Gamma endpoint disabled"));
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn tags_related_to_tag_by_slug_should_succeed() -> anyhow::Result<()> {
+    async fn tags_related_to_tag_by_slug_should_return_validation_error() -> anyhow::Result<()> {
         let server = MockServer::start();
         let client = Client::new(&server.base_url())?;
 
-        let mock = server.mock(|when, then| {
-            when.method(GET)
-                .path("/tags/slug/politics/related-tags/tags");
-            then.status(StatusCode::OK).json_body(json!([
-                {
-                    "id": "50",
-                    "label": "Elections",
-                    "slug": "elections",
-                    "forceShow": true,
-                    "forceHide": false,
-                    "isCarousel": true
-                }
-            ]));
-        });
-
         let request = RelatedTagsBySlugRequest::builder().slug("politics").build();
-        let response = client.tags_related_to_tag_by_slug(&request).await?;
+        let error = client
+            .tags_related_to_tag_by_slug(&request)
+            .await
+            .unwrap_err();
 
-        assert_eq!(response.len(), 1);
-        assert_eq!(response[0].id, "50");
-        assert_eq!(response[0].label, Some("Elections".to_owned()));
-        mock.assert();
+        assert_eq!(error.kind(), Kind::Validation);
+        assert!(error.to_string().contains("Legacy Gamma endpoint disabled"));
 
         Ok(())
     }
@@ -738,177 +684,99 @@ mod series {
 }
 
 mod comments {
-    use httpmock::{Method::GET, MockServer};
+    use httpmock::MockServer;
+    use kuest_client_sdk::error::Kind;
     use kuest_client_sdk::gamma::types::ParentEntityType;
     use kuest_client_sdk::gamma::{
         Client,
         types::request::{CommentsByIdRequest, CommentsByUserAddressRequest, CommentsRequest},
     };
     use kuest_client_sdk::types::address;
-    use reqwest::StatusCode;
-    use serde_json::json;
 
     #[tokio::test]
-    async fn comments_should_succeed() -> anyhow::Result<()> {
+    async fn comments_should_return_validation_error() -> anyhow::Result<()> {
         let server = MockServer::start();
         let client = Client::new(&server.base_url())?;
-
-        let mock = server.mock(|when, then| {
-            when.method(GET).path("/comments");
-            then.status(StatusCode::OK).json_body(json!([
-                {
-                    "id": "1",
-                    "body": "Great market!",
-                    "parentEntityType": "Event",
-                    "parentEntityID": 123,
-                    "userAddress": "0x56687bf447db6ffa42ffe2204a05edaa20f55839",
-                    "createdAt": "2024-01-15T10:30:00Z"
-                }
-            ]));
-        });
 
         let request = CommentsRequest::builder()
             .parent_entity_type(ParentEntityType::Event)
             .parent_entity_id("123")
             .build();
-        let response = client.comments(&request).await?;
+        let error = client.comments(&request).await.unwrap_err();
 
-        assert_eq!(response.len(), 1);
-        assert_eq!(response[0].id, "1");
-        assert_eq!(response[0].body, Some("Great market!".to_owned()));
-        mock.assert();
+        assert_eq!(error.kind(), Kind::Validation);
+        assert!(error.to_string().contains("Legacy Gamma endpoint disabled"));
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn comments_with_filters_should_succeed() -> anyhow::Result<()> {
+    async fn comments_with_filters_should_return_validation_error() -> anyhow::Result<()> {
         let server = MockServer::start();
         let client = Client::new(&server.base_url())?;
-
-        let mock = server.mock(|when, then| {
-            when.method(GET)
-                .path("/comments")
-                .query_param("parent_entity_type", "Event")
-                .query_param("parent_entity_id", "123")
-                .query_param("limit", "10");
-            then.status(StatusCode::OK).json_body(json!([]));
-        });
 
         let request = CommentsRequest::builder()
             .parent_entity_type(ParentEntityType::Event)
             .parent_entity_id("123")
             .limit(10)
             .build();
-        let response = client.comments(&request).await?;
+        let error = client.comments(&request).await.unwrap_err();
 
-        assert!(response.is_empty());
-        mock.assert();
+        assert_eq!(error.kind(), Kind::Validation);
+        assert!(error.to_string().contains("Legacy Gamma endpoint disabled"));
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn comments_by_id_should_succeed() -> anyhow::Result<()> {
+    async fn comments_by_id_should_return_validation_error() -> anyhow::Result<()> {
         let server = MockServer::start();
         let client = Client::new(&server.base_url())?;
-
-        let mock = server.mock(|when, then| {
-            when.method(GET).path("/comments/42");
-            then.status(StatusCode::OK).json_body(json!([
-                {
-                    "id": "42",
-                    "body": "This is the comment",
-                    "parentEntityType": "Event",
-                    "parentEntityID": 100
-                }
-            ]));
-        });
 
         let request = CommentsByIdRequest::builder().id("42").build();
-        let response = client.comments_by_id(&request).await?;
+        let error = client.comments_by_id(&request).await.unwrap_err();
 
-        assert_eq!(response.len(), 1);
-        assert_eq!(response[0].id, "42");
-        assert_eq!(response[0].body, Some("This is the comment".to_owned()));
-        mock.assert();
+        assert_eq!(error.kind(), Kind::Validation);
+        assert!(error.to_string().contains("Legacy Gamma endpoint disabled"));
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn comments_by_user_address_should_succeed() -> anyhow::Result<()> {
+    async fn comments_by_user_address_should_return_validation_error() -> anyhow::Result<()> {
         let server = MockServer::start();
         let client = Client::new(&server.base_url())?;
-
-        let mock = server.mock(|when, then| {
-            // Address is serialized with EIP-55 checksum format
-            when.method(GET)
-                .path("/comments/user_address/0x56687BF447DB6fFA42FFE2204a05EDAA20f55839");
-            then.status(StatusCode::OK).json_body(json!([
-                {
-                    "id": "1",
-                    "body": "User comment",
-                    "userAddress": "0x56687BF447DB6fFA42FFE2204a05EDAA20f55839"
-                },
-                {
-                    "id": "2",
-                    "body": "Another comment",
-                    "userAddress": "0x56687BF447DB6fFA42FFE2204a05EDAA20f55839"
-                }
-            ]));
-        });
 
         let request = CommentsByUserAddressRequest::builder()
             .user_address(address!("0x56687bf447db6ffa42ffe2204a05edaa20f55839"))
             .build();
-        let response = client.comments_by_user_address(&request).await?;
+        let error = client.comments_by_user_address(&request).await.unwrap_err();
 
-        assert_eq!(response.len(), 2);
-        assert_eq!(response[0].body, Some("User comment".to_owned()));
-        assert_eq!(response[1].body, Some("Another comment".to_owned()));
-        mock.assert();
+        assert_eq!(error.kind(), Kind::Validation);
+        assert!(error.to_string().contains("Legacy Gamma endpoint disabled"));
 
         Ok(())
     }
 }
 
 mod profiles {
-    use httpmock::{Method::GET, MockServer};
+    use httpmock::MockServer;
+    use kuest_client_sdk::error::Kind;
     use kuest_client_sdk::gamma::{Client, types::request::PublicProfileRequest};
     use kuest_client_sdk::types::address;
-    use reqwest::StatusCode;
-    use serde_json::json;
 
     #[tokio::test]
-    async fn public_profile_should_succeed() -> anyhow::Result<()> {
+    async fn public_profile_should_return_validation_error() -> anyhow::Result<()> {
         let server = MockServer::start();
         let client = Client::new(&server.base_url())?;
-
-        let mock = server.mock(|when, then| {
-            // Address serializes to lowercase hex via serde
-            when.method(GET)
-                .path("/public-profile")
-                .query_param("address", "0x56687bf447db6ffa42ffe2204a05edaa20f55839");
-            then.status(StatusCode::OK).json_body(json!({
-                "proxyWallet": "0x56687bf447db6ffa42ffe2204a05edaa20f55839",
-                "name": "Kuest Trader",
-                "pseudonym": "PolyTrader",
-                "bio": "Trading prediction markets",
-                "displayUsernamePublic": true,
-                "verifiedBadge": false
-            }));
-        });
 
         let request = PublicProfileRequest::builder()
             .address(address!("0x56687bf447db6ffa42ffe2204a05edaa20f55839"))
             .build();
-        let response = client.public_profile(&request).await?;
+        let error = client.public_profile(&request).await.unwrap_err();
 
-        assert_eq!(response.name, Some("Kuest Trader".to_owned()));
-        assert_eq!(response.pseudonym, Some("PolyTrader".to_owned()));
-        assert_eq!(response.verified_badge, Some(false));
-        mock.assert();
+        assert_eq!(error.kind(), Kind::Validation);
+        assert!(error.to_string().contains("Legacy Gamma endpoint disabled"));
 
         Ok(())
     }

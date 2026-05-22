@@ -1,18 +1,16 @@
 use std::str::FromStr as _;
 
+use crate::sdk_site_config;
 use crate::types::B256;
 
-pub(crate) const SITE_BUILDER_CODE: &str = "";
-pub(crate) const SITE_ORDER_METADATA: &str =
-    "0x0000000000000000000000000000000000000000000000000000000000000000";
-
-pub(crate) fn builder_code() -> Option<B256> {
-    let value = SITE_BUILDER_CODE.trim();
-    if value.is_empty() {
+fn parse_b256(value: Option<String>) -> Option<B256> {
+    let value = value?;
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
         return None;
     }
 
-    let parsed = B256::from_str(value).ok()?;
+    let parsed = B256::from_str(trimmed).ok()?;
     if parsed == B256::ZERO {
         return None;
     }
@@ -20,16 +18,10 @@ pub(crate) fn builder_code() -> Option<B256> {
     Some(parsed)
 }
 
+pub(crate) fn builder_code() -> Option<B256> {
+    parse_b256(sdk_site_config::builder_code())
+}
+
 pub(crate) fn order_metadata() -> Option<B256> {
-    let value = SITE_ORDER_METADATA.trim();
-    if value.is_empty() {
-        return None;
-    }
-
-    let parsed = B256::from_str(value).ok()?;
-    if parsed == B256::ZERO {
-        return None;
-    }
-
-    Some(parsed)
+    parse_b256(sdk_site_config::order_metadata())
 }
