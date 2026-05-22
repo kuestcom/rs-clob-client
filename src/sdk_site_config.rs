@@ -24,7 +24,7 @@ impl Default for SiteConfig {
             builder_mode: false,
             geoblock: false,
             builder_code: String::new(),
-            order_metadata: ZERO_BYTES32.to_string(),
+            order_metadata: ZERO_BYTES32.to_owned(),
         }
     }
 }
@@ -56,7 +56,7 @@ pub(crate) fn site_url() -> Option<String> {
     if value.is_empty() {
         None
     } else {
-        Some(value.to_string())
+        Some(value.to_owned())
     }
 }
 
@@ -65,7 +65,7 @@ pub(crate) fn builder_code() -> Option<String> {
     if value.is_empty() {
         None
     } else {
-        Some(value.to_string())
+        Some(value.to_owned())
     }
 }
 
@@ -74,6 +74,6 @@ pub(crate) fn order_metadata() -> Option<String> {
     if value.is_empty() {
         None
     } else {
-        Some(value.to_string())
+        Some(value.to_owned())
     }
 }

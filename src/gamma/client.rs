@@ -125,7 +125,7 @@ fn normalize_site_origin(raw: &str) -> Result<Url> {
     }
 
     let candidate = if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
-        trimmed.to_string()
+        trimmed.to_owned()
     } else {
         format!("https://{trimmed}")
     };
@@ -164,7 +164,7 @@ fn normalize_creator_wallets(wallets: &[String]) -> Vec<String> {
                     .chars()
                     .skip(2)
                     .all(|char| char.is_ascii_hexdigit());
-            if valid { Some(normalized) } else { None }
+            valid.then_some(normalized)
         })
         .collect::<BTreeSet<_>>()
         .into_iter()
@@ -180,14 +180,13 @@ fn legacy_disabled(endpoint: &str) -> Error {
 impl CreatorScopeState {
     async fn creator_query(&self, client: &ReqwestClient) -> Result<Option<String>> {
         {
-            let cache = self
-                .cache
-                .lock()
-                .map_err(|_| Error::validation("creator scope cache poisoned"))?;
-            if let Some(entry) = cache.as_ref() {
-                if entry.expires_at > Instant::now() {
-                    return Ok(Some(entry.creator_query.clone()));
-                }
+            let cache = self.cache.lock().map_err(|error| {
+                Error::validation(format!("creator scope cache poisoned: {error}"))
+            })?;
+            if let Some(entry) = cache.as_ref()
+                && entry.expires_at > Instant::now()
+            {
+                return Ok(Some(entry.creator_query.clone()));
             }
         }
 
@@ -220,7 +219,7 @@ impl CreatorScopeState {
         let mut cache = self
             .cache
             .lock()
-            .map_err(|_| Error::validation("creator scope cache poisoned"))?;
+            .map_err(|error| Error::validation(format!("creator scope cache poisoned: {error}")))?;
         *cache = Some(CreatorScopeCacheEntry {
             creator_query: creator_query.clone(),
             expires_at: Instant::now() + CREATOR_SCOPE_CACHE_TTL,
@@ -287,10 +286,10 @@ impl Client {
             url.set_query(Some(query.trim_start_matches('?')));
         }
 
-        if let Some(creator_scope) = &self.creator_scope {
-            if let Some(creator_query) = creator_scope.creator_query(&self.client).await? {
-                url.query_pairs_mut().append_pair("creator", &creator_query);
-            }
+        if let Some(creator_scope) = &self.creator_scope
+            && let Some(creator_query) = creator_scope.creator_query(&self.client).await?
+        {
+            url.query_pairs_mut().append_pair("creator", &creator_query);
         }
 
         let request = self.client.request(Method::GET, url).build()?;
@@ -410,12 +409,15 @@ impl Client {
     /// # Errors
     ///
     /// Returns an error if the tag ID is invalid or the request fails.
+    #[expect(
+        clippy::unused_async,
+        reason = "legacy endpoint intentionally disabled"
+    )]
     pub async fn related_tags_by_id(
         &self,
-        request: &RelatedTagsByIdRequest,
+        _request: &RelatedTagsByIdRequest,
     ) -> Result<Vec<RelatedTag>> {
         // Legacy endpoint intentionally disabled until gamma-api supports this data source.
-        let _ = request;
         Err(legacy_disabled("tags/{id}/related-tags"))
     }
 
@@ -426,12 +428,15 @@ impl Client {
     /// # Errors
     ///
     /// Returns an error if the slug is invalid or the request fails.
+    #[expect(
+        clippy::unused_async,
+        reason = "legacy endpoint intentionally disabled"
+    )]
     pub async fn related_tags_by_slug(
         &self,
-        request: &RelatedTagsBySlugRequest,
+        _request: &RelatedTagsBySlugRequest,
     ) -> Result<Vec<RelatedTag>> {
         // Legacy endpoint intentionally disabled until gamma-api supports this data source.
-        let _ = request;
         Err(legacy_disabled("tags/slug/{slug}/related-tags"))
     }
 
@@ -443,12 +448,15 @@ impl Client {
     /// # Errors
     ///
     /// Returns an error if the tag ID is invalid or the request fails.
+    #[expect(
+        clippy::unused_async,
+        reason = "legacy endpoint intentionally disabled"
+    )]
     pub async fn tags_related_to_tag_by_id(
         &self,
-        request: &RelatedTagsByIdRequest,
+        _request: &RelatedTagsByIdRequest,
     ) -> Result<Vec<Tag>> {
         // Legacy endpoint intentionally disabled until gamma-api supports this data source.
-        let _ = request;
         Err(legacy_disabled("tags/{id}/related-tags/tags"))
     }
 
@@ -459,12 +467,15 @@ impl Client {
     /// # Errors
     ///
     /// Returns an error if the slug is invalid or the request fails.
+    #[expect(
+        clippy::unused_async,
+        reason = "legacy endpoint intentionally disabled"
+    )]
     pub async fn tags_related_to_tag_by_slug(
         &self,
-        request: &RelatedTagsBySlugRequest,
+        _request: &RelatedTagsBySlugRequest,
     ) -> Result<Vec<Tag>> {
         // Legacy endpoint intentionally disabled until gamma-api supports this data source.
-        let _ = request;
         Err(legacy_disabled("tags/slug/{slug}/related-tags/tags"))
     }
 
@@ -602,9 +613,12 @@ impl Client {
     /// # Errors
     ///
     /// Returns an error if the request fails.
-    pub async fn comments(&self, request: &CommentsRequest) -> Result<Vec<Comment>> {
+    #[expect(
+        clippy::unused_async,
+        reason = "legacy endpoint intentionally disabled"
+    )]
+    pub async fn comments(&self, _request: &CommentsRequest) -> Result<Vec<Comment>> {
         // Legacy endpoint intentionally disabled until gamma-api supports this data source.
-        let _ = request;
         Err(legacy_disabled("comments"))
     }
 
@@ -616,9 +630,12 @@ impl Client {
     /// # Errors
     ///
     /// Returns an error if the comment ID is invalid or the request fails.
-    pub async fn comments_by_id(&self, request: &CommentsByIdRequest) -> Result<Vec<Comment>> {
+    #[expect(
+        clippy::unused_async,
+        reason = "legacy endpoint intentionally disabled"
+    )]
+    pub async fn comments_by_id(&self, _request: &CommentsByIdRequest) -> Result<Vec<Comment>> {
         // Legacy endpoint intentionally disabled until gamma-api supports this data source.
-        let _ = request;
         Err(legacy_disabled("comments/{id}"))
     }
 
@@ -630,12 +647,15 @@ impl Client {
     /// # Errors
     ///
     /// Returns an error if the address is invalid or the request fails.
+    #[expect(
+        clippy::unused_async,
+        reason = "legacy endpoint intentionally disabled"
+    )]
     pub async fn comments_by_user_address(
         &self,
-        request: &CommentsByUserAddressRequest,
+        _request: &CommentsByUserAddressRequest,
     ) -> Result<Vec<Comment>> {
         // Legacy endpoint intentionally disabled until gamma-api supports this data source.
-        let _ = request;
         Err(legacy_disabled("comments/user_address/{address}"))
     }
 
@@ -648,9 +668,12 @@ impl Client {
     /// # Errors
     ///
     /// Returns an error if the address is invalid or the request fails.
-    pub async fn public_profile(&self, request: &PublicProfileRequest) -> Result<PublicProfile> {
+    #[expect(
+        clippy::unused_async,
+        reason = "legacy endpoint intentionally disabled"
+    )]
+    pub async fn public_profile(&self, _request: &PublicProfileRequest) -> Result<PublicProfile> {
         // Legacy endpoint intentionally disabled until gamma-api supports this data source.
-        let _ = request;
         Err(legacy_disabled("public-profile"))
     }
 
