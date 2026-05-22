@@ -22,7 +22,7 @@
 //! | `/tags` | List tags |
 //! | `/tags/{id}` | Get tag by ID |
 //! | `/tags/slug/{slug}` | Get tag by slug |
-//! | `/tags/{id}/related-tags` | Get related tag relationships |
+//! | `/tags/{id}/related-tags` | Legacy disabled in white-label bundles |
 //! | `/events` | List events |
 //! | `/events/{id}` | Get event by ID |
 //! | `/events/slug/{slug}` | Get event by slug |
@@ -33,9 +33,9 @@
 //! | `/markets/{id}/tags` | Get market tags |
 //! | `/series` | List series |
 //! | `/series/{id}` | Get series by ID |
-//! | `/comments` | List comments |
-//! | `/comments/{id}` | Get comments by ID |
-//! | `/public-profile` | Get public profile |
+//! | `/comments` | Legacy disabled in white-label bundles |
+//! | `/comments/{id}` | Legacy disabled in white-label bundles |
+//! | `/public-profile` | Legacy disabled in white-label bundles |
 //! | `/public-search` | Search markets, events, and profiles |
 //!
 //! # Example

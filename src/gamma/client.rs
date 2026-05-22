@@ -25,7 +25,10 @@
 //! # }
 //! ```
 
+use std::collections::BTreeSet;
 use std::future::Future;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use async_stream::try_stream;
 use futures::Stream;
@@ -33,8 +36,8 @@ use reqwest::{
     Client as ReqwestClient, Method,
     header::{HeaderMap, HeaderValue},
 };
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "tracing")]
 use tracing::warn;
 use url::Url;
@@ -51,9 +54,11 @@ use super::types::response::{
     SportsMarketTypesResponse, SportsMetadata, Tag, Team,
 };
 use crate::error::Error;
+use crate::sdk_site_config;
 use crate::{Result, ToQueryParams as _};
 
 const MAX_LIMIT: i32 = 500;
+const CREATOR_SCOPE_CACHE_TTL: Duration = Duration::from_secs(30 * 60);
 
 /// HTTP client for the Kuest Gamma API.
 ///
@@ -84,13 +89,145 @@ pub struct Client {
     host: Url,
     client: ReqwestClient,
     disabled: bool,
+    creator_scope: Option<CreatorScopeState>,
 }
 
 const DEFAULT_HOST: &str = "https://gamma-api.kuest.com/#disabled";
 const DISABLED_HOST: &str = "gamma-api.kuest.com";
 
+#[derive(Clone, Debug)]
+struct CreatorScopeState {
+    endpoint_url: Url,
+    cache: Arc<Mutex<Option<CreatorScopeCacheEntry>>>,
+}
+
+#[derive(Clone, Debug)]
+struct CreatorScopeCacheEntry {
+    creator_query: String,
+    expires_at: Instant,
+}
+
+#[derive(Debug, Deserialize)]
+struct AllowedCreatorsResponse {
+    wallets: Vec<String>,
+}
+
 fn is_disabled_host(host: &Url) -> bool {
     host.fragment().is_some() || host.host_str() == Some(DISABLED_HOST)
+}
+
+fn normalize_site_origin(raw: &str) -> Result<Url> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err(Error::validation(
+            "site_url from .sdk/site-config.json is empty",
+        ));
+    }
+
+    let candidate = if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+        trimmed.to_string()
+    } else {
+        format!("https://{trimmed}")
+    };
+
+    let mut url = Url::parse(&candidate)?;
+    url.set_path("");
+    url.set_query(None);
+    url.set_fragment(None);
+
+    Ok(url)
+}
+
+fn build_creator_scope_state() -> Result<Option<CreatorScopeState>> {
+    let Some(site_url) = sdk_site_config::site_url() else {
+        return Ok(None);
+    };
+
+    let endpoint_url = normalize_site_origin(&site_url)?
+        .join("api/allowed-market-creators")
+        .map_err(Error::from)?;
+
+    Ok(Some(CreatorScopeState {
+        endpoint_url,
+        cache: Arc::new(Mutex::new(None)),
+    }))
+}
+
+fn normalize_creator_wallets(wallets: &[String]) -> Vec<String> {
+    wallets
+        .iter()
+        .filter_map(|wallet| {
+            let normalized = wallet.trim().to_ascii_lowercase();
+            let valid = normalized.starts_with("0x")
+                && normalized.len() == 42
+                && normalized
+                    .chars()
+                    .skip(2)
+                    .all(|char| char.is_ascii_hexdigit());
+            if valid { Some(normalized) } else { None }
+        })
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+fn legacy_disabled(endpoint: &str) -> Error {
+    Error::validation(format!(
+        "Legacy Gamma endpoint disabled in this SDK bundle: {endpoint}"
+    ))
+}
+
+impl CreatorScopeState {
+    async fn creator_query(&self, client: &ReqwestClient) -> Result<Option<String>> {
+        {
+            let cache = self
+                .cache
+                .lock()
+                .map_err(|_| Error::validation("creator scope cache poisoned"))?;
+            if let Some(entry) = cache.as_ref() {
+                if entry.expires_at > Instant::now() {
+                    return Ok(Some(entry.creator_query.clone()));
+                }
+            }
+        }
+
+        let request = client
+            .request(Method::GET, self.endpoint_url.clone())
+            .build()?;
+        let response = client.execute(request).await?;
+        let status_code = response.status();
+
+        if !status_code.is_success() {
+            let message = response.text().await.unwrap_or_default();
+            return Err(Error::status(
+                status_code,
+                Method::GET,
+                self.endpoint_url.path().to_owned(),
+                message,
+            ));
+        }
+
+        let payload = response.json::<AllowedCreatorsResponse>().await?;
+        let wallets = normalize_creator_wallets(&payload.wallets);
+        if wallets.is_empty() {
+            return Err(Error::validation(format!(
+                "No allowed market creators returned by {}",
+                self.endpoint_url
+            )));
+        }
+
+        let creator_query = wallets.join(",");
+        let mut cache = self
+            .cache
+            .lock()
+            .map_err(|_| Error::validation("creator scope cache poisoned"))?;
+        *cache = Some(CreatorScopeCacheEntry {
+            creator_query: creator_query.clone(),
+            expires_at: Instant::now() + CREATOR_SCOPE_CACHE_TTL,
+        });
+
+        Ok(Some(creator_query))
+    }
 }
 
 impl Default for Client {
@@ -119,11 +256,13 @@ impl Client {
         let client = ReqwestClient::builder().default_headers(headers).build()?;
         let host = Url::parse(host)?;
         let disabled = is_disabled_host(&host);
+        let creator_scope = build_creator_scope_state()?;
 
         Ok(Self {
             host,
             client,
             disabled,
+            creator_scope,
         })
     }
 
@@ -142,11 +281,19 @@ impl Client {
             return Err(Error::validation("Gamma desativada"));
         }
 
+        let mut url = self.host.join(path)?;
         let query = req.query_params(None);
-        let request = self
-            .client
-            .request(Method::GET, format!("{}{path}{query}", self.host))
-            .build()?;
+        if !query.is_empty() {
+            url.set_query(Some(query.trim_start_matches('?')));
+        }
+
+        if let Some(creator_scope) = &self.creator_scope {
+            if let Some(creator_query) = creator_scope.creator_query(&self.client).await? {
+                url.query_pairs_mut().append_pair("creator", &creator_query);
+            }
+        }
+
+        let request = self.client.request(Method::GET, url).build()?;
         crate::request(&self.client, request, None).await
     }
 
@@ -267,8 +414,9 @@ impl Client {
         &self,
         request: &RelatedTagsByIdRequest,
     ) -> Result<Vec<RelatedTag>> {
-        self.get(&format!("tags/{}/related-tags", request.id), request)
-            .await
+        // Legacy endpoint intentionally disabled until gamma-api supports this data source.
+        let _ = request;
+        Err(legacy_disabled("tags/{id}/related-tags"))
     }
 
     /// Retrieves related tag relationships for a tag by slug.
@@ -282,8 +430,9 @@ impl Client {
         &self,
         request: &RelatedTagsBySlugRequest,
     ) -> Result<Vec<RelatedTag>> {
-        self.get(&format!("tags/slug/{}/related-tags", request.slug), request)
-            .await
+        // Legacy endpoint intentionally disabled until gamma-api supports this data source.
+        let _ = request;
+        Err(legacy_disabled("tags/slug/{slug}/related-tags"))
     }
 
     /// Retrieves tags that are related to a specified tag by ID.
@@ -298,8 +447,9 @@ impl Client {
         &self,
         request: &RelatedTagsByIdRequest,
     ) -> Result<Vec<Tag>> {
-        self.get(&format!("tags/{}/related-tags/tags", request.id), request)
-            .await
+        // Legacy endpoint intentionally disabled until gamma-api supports this data source.
+        let _ = request;
+        Err(legacy_disabled("tags/{id}/related-tags/tags"))
     }
 
     /// Retrieves tags that are related to a specified tag by slug.
@@ -313,11 +463,9 @@ impl Client {
         &self,
         request: &RelatedTagsBySlugRequest,
     ) -> Result<Vec<Tag>> {
-        self.get(
-            &format!("tags/slug/{}/related-tags/tags", request.slug),
-            request,
-        )
-        .await
+        // Legacy endpoint intentionally disabled until gamma-api supports this data source.
+        let _ = request;
+        Err(legacy_disabled("tags/slug/{slug}/related-tags/tags"))
     }
 
     /// Retrieves a list of events with optional filtering.
@@ -455,7 +603,9 @@ impl Client {
     ///
     /// Returns an error if the request fails.
     pub async fn comments(&self, request: &CommentsRequest) -> Result<Vec<Comment>> {
-        self.get("comments", request).await
+        // Legacy endpoint intentionally disabled until gamma-api supports this data source.
+        let _ = request;
+        Err(legacy_disabled("comments"))
     }
 
     /// Retrieves comments by their unique comment ID.
@@ -467,7 +617,9 @@ impl Client {
     ///
     /// Returns an error if the comment ID is invalid or the request fails.
     pub async fn comments_by_id(&self, request: &CommentsByIdRequest) -> Result<Vec<Comment>> {
-        self.get(&format!("comments/{}", request.id), request).await
+        // Legacy endpoint intentionally disabled until gamma-api supports this data source.
+        let _ = request;
+        Err(legacy_disabled("comments/{id}"))
     }
 
     /// Retrieves all comments authored by a specific wallet address.
@@ -482,11 +634,9 @@ impl Client {
         &self,
         request: &CommentsByUserAddressRequest,
     ) -> Result<Vec<Comment>> {
-        self.get(
-            &format!("comments/user_address/{}", request.user_address),
-            request,
-        )
-        .await
+        // Legacy endpoint intentionally disabled until gamma-api supports this data source.
+        let _ = request;
+        Err(legacy_disabled("comments/user_address/{address}"))
     }
 
     /// Retrieves a public trading profile for a wallet address.
@@ -499,7 +649,9 @@ impl Client {
     ///
     /// Returns an error if the address is invalid or the request fails.
     pub async fn public_profile(&self, request: &PublicProfileRequest) -> Result<PublicProfile> {
-        self.get("public-profile", request).await
+        // Legacy endpoint intentionally disabled until gamma-api supports this data source.
+        let _ = request;
+        Err(legacy_disabled("public-profile"))
     }
 
     /// Searches across markets, events, and user profiles.
