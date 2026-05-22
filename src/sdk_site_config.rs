@@ -51,6 +51,7 @@ pub(crate) fn site_config() -> &'static SiteConfig {
     SITE_CONFIG.get_or_init(load_site_config)
 }
 
+#[cfg(feature = "gamma")]
 pub(crate) fn site_url() -> Option<String> {
     let value = site_config().site_url.trim();
     if value.is_empty() {
