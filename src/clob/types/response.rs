@@ -370,7 +370,9 @@ where
 pub struct OpenOrderResponse {
     pub id: String,
     pub status: OrderStatusType,
-    pub owner: ApiKey,
+    /// The user ID (ULID) associated with the order.
+    #[serde(deserialize_with = "crate::serde_helpers::deserialize_ulid_string")]
+    pub owner: String,
     pub maker_address: Address,
     /// The market condition ID.
     pub market: B256,
@@ -383,7 +385,7 @@ pub struct OpenOrderResponse {
     #[serde_as(deserialize_as = "DefaultOnNull")]
     pub associate_trades: Vec<String>,
     pub outcome: String,
-    #[serde(with = "chrono::serde::ts_seconds")]
+    #[serde(deserialize_with = "crate::serde_helpers::deserialize_datetime_from_unix_or_rfc3339")]
     pub created_at: DateTime<Utc>,
     #[serde_as(as = "TimestampSeconds<String>")]
     pub expiration: DateTime<Utc>,
