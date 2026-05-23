@@ -1,0 +1,45 @@
+name: Release
+
+permissions:
+  pull-requests: write
+  contents: write
+  id-token: write # Required for trusted publishing
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-plz:
+    name: Release
+    # Ubuntu 24.04
+    runs-on: ubuntu-24.04
+    environment: Release-plz
+    if: ${{ github.repository_owner == 'kuestcom' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Authenticate with crates.io
+        uses: rust-lang/crates-io-auth-action@bbd81622f20ce9e2dd9622e3218b975523e45bbe # v1.0.4
+        id: auth
+
+      - name: Install Rust 1.91.1
+        run: |
+          rustup toolchain install 1.91.1 --profile minimal --no-self-update
+          rustup default 1.91.1
+          rustc --version
+
+      - name: Run release-plz
+        uses: release-plz/action@064f4d1e36c843611ddf013be726beaa4ad804db # v0.5.129
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}

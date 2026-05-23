@@ -1,4 +1,4 @@
-### Security
+# Security Policy
 
 If you believe you’ve found a security vulnerability, please email security@kuest.com. Do not open a public issue.
 

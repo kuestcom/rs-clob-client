@@ -4,10 +4,7 @@
 </h1>
 
 [![Crates.io](https://img.shields.io/crates/v/kuest-client-sdk.svg)](https://crates.io/crates/kuest-client-sdk)
-[![CI](https://github.com/kuestcom/rs-clob-client/actions/workflows/ci.yml/badge.svg)](https://github.com/kuestcom/rs-clob-client/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/kuestcom/rs-clob-client/graph/badge.svg?token=FW1BYWWFJ2)](https://codecov.io/gh/kuestcom/rs-clob-client)
-
-Rust SDK for the Kuest CLOB.
+[![PR](https://github.com/kuestcom/rs-clob-client/actions/workflows/pr.yml/badge.svg)](https://github.com/kuestcom/rs-clob-client/actions/workflows/pr.yml)
 
 ## Install
 
@@ -56,9 +53,3 @@ let client = Client::new("https://clob.kuest.com", Config::default())?
 # Ok(())
 # }
 ```
-
-## Notes
-
-- USDC remains the settlement collateral.
-- Auth headers sent to Kuest services remain `KUEST_*`.
-- Neutral local aliases such as `PRIVATE_KEY` or `API_KEY` can be used by applications before constructing SDK config.
