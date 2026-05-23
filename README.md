@@ -56,9 +56,3 @@ let client = Client::new("https://clob.kuest.com", Config::default())?
 # Ok(())
 # }
 ```
-
-## Notes
-
-- USDC remains the settlement collateral.
-- Auth headers sent to Kuest services remain `KUEST_*`.
-- Neutral local aliases such as `PRIVATE_KEY` or `API_KEY` can be used by applications before constructing SDK config.

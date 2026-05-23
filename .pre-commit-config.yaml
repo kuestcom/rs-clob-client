@@ -7,22 +7,29 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+      - id: check-toml
       - id: check-added-large-files
   - repo: https://github.com/DevinR528/cargo-sort
-    rev: v2.0.2
+    rev: v2.1.4
     hooks:
       - id: cargo-sort
   - repo: local
     hooks:
       - id: fmt
         name: fmt
-        entry: cargo +nightly fmt --all -- --check
+        entry: cargo +nightly-2025-11-24 fmt --all -- --check
         language: system
-        types: [ rust ]
+        files: ^(src|tests|examples|benches)/|^(Cargo\.toml|rustfmt\.toml)$
+        pass_filenames: false
+      - id: clippy-all-features
+        name: clippy all features
+        entry: cargo clippy --workspace --all-features --all-targets -- -D warnings
+        language: system
+        files: ^(src|tests|examples|benches)/|^(Cargo\.toml|Cargo\.lock|clippy\.toml)$
         pass_filenames: false
       - id: clippy
         name: clippy
-        entry: cargo clippy --workspace --all-features --all-targets -- -D warnings
+        entry: cargo clippy --workspace --all-targets -- -D warnings
         language: system
-        types: [ rust ]
+        files: ^(src|tests|examples|benches)/|^(Cargo\.toml|Cargo\.lock|clippy\.toml)$
         pass_filenames: false

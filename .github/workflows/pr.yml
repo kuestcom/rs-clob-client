@@ -1,0 +1,77 @@
+name: PR
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        runner:
+          - ubuntu-24.04
+          - macos-26
+          - windows-2025
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Rust 1.91.1
+        run: |
+          rustup toolchain install 1.91.1 --profile minimal --no-self-update
+          rustup default 1.91.1
+
+      - run: cargo build --all-targets --all-features
+      - run: cargo test
+
+  fmt-lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Rust 1.91.1 with Clippy
+        run: |
+          rustup toolchain install 1.91.1 --profile minimal --component clippy --no-self-update
+          rustup default 1.91.1
+
+      - name: Install Rust nightly-2025-11-24 with rustfmt
+        run: rustup toolchain install nightly-2025-11-24 --profile minimal --component rustfmt --no-self-update
+
+      - name: Rustfmt (nightly)
+        run: cargo +nightly-2025-11-24 fmt --all -- --check
+
+      - name: Clippy (All features)
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+  cargo-sort:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Rust 1.91.1
+        run: |
+          rustup toolchain install 1.91.1 --profile minimal --no-self-update
+          rustup default 1.91.1
+
+      - name: Install cargo-sort 2.1.4
+        run: cargo install cargo-sort --locked --version 2.1.4
+
+      - name: Check Cargo.toml sorting
+        run: cargo sort --check

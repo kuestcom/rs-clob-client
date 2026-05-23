@@ -1,0 +1,106 @@
+name: Bug report
+description: Report a reproducible bug in kuest-client-sdk
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting an issue with the Rust SDK. Please include enough detail for maintainers to reproduce the behavior locally.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the bug and the impact it has on your integration.
+      placeholder: The SDK returns ..., but the Kuest API response indicates ...
+    validations:
+      required: true
+  - type: input
+    id: crate_version
+    attributes:
+      label: Crate version
+      description: The kuest-client-sdk version from Cargo.toml or Cargo.lock.
+      placeholder: kuest-client-sdk = "2.0.5"
+    validations:
+      required: true
+  - type: textarea
+    id: cargo_features
+    attributes:
+      label: Cargo features
+      description: List the SDK features you enabled.
+      placeholder: |
+        features = ["clob", "ws", "tracing"]
+        default-features = false
+    validations:
+      required: true
+  - type: textarea
+    id: toolchain
+    attributes:
+      label: Rust toolchain and platform
+      description: Paste `rustc -Vv`, `cargo -V`, and your OS/target triple.
+      placeholder: |
+        rustc 1.88.0 (...)
+        cargo 1.88.0 (...)
+        host: aarch64-apple-darwin
+        OS: macOS 15.5
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Minimal reproduction
+      description: Provide the smallest code sample, command, or test case that reproduces the issue.
+      placeholder: |
+        1. Create a new binary crate.
+        2. Add kuest-client-sdk with features ["clob"].
+        3. Run this snippet:
+
+        ```rust
+        // code here
+        ```
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should the SDK have done?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, backtraces, or HTTP details
+      description: Include sanitized logs, `RUST_BACKTRACE=1` output, request IDs, response status codes, or endpoint names if relevant. Do not include secrets or private keys.
+      render: text
+    validations:
+      required: false
+  - type: dropdown
+    id: regression
+    attributes:
+      label: Regression?
+      description: Did this work in an earlier crate version?
+      options:
+        - Not sure
+        - "No"
+        - "Yes"
+    validations:
+      required: false
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have removed secrets, private keys, and API credentials from this report.
+          required: true
+        - label: I have checked the README and examples for the affected feature.
+          required: true
