@@ -166,7 +166,7 @@ pub fn orderbook_summary_hash(orderbook: &OrderBookSummaryResponse) -> String {
     hasher.update(json.as_bytes());
     let result = hasher.finalize();
 
-    format!("{result:x}")
+    alloy::hex::encode(result)
 }
 
 /// Adjusts a market-buy USDC amount to account for platform and builder taker fees.

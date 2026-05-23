@@ -26,6 +26,8 @@ use crate::common::{
     ensure_requirements, token_1, token_2,
 };
 
+const OPEN_ORDER_OWNER: &str = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+
 mod unauthenticated {
 
     use chrono::{TimeDelta, TimeZone as _};
@@ -1692,7 +1694,7 @@ mod authenticated {
         let json = json!({
             "id": "1",
             "status": "LIVE",
-            "owner": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+            "owner": OPEN_ORDER_OWNER,
             "maker_address": "0x2222222222222222222222222222222222222222",
             "market": "0x000000000000000000000000000000000000000000000000006d61726b657461",
             "asset_id": token_1(),
@@ -1705,7 +1707,7 @@ mod authenticated {
                 "0xtradehash2"
             ],
             "outcome": "YES",
-            "created_at": 1_705_322_096,
+            "created_at": "2024-01-15T12:34:56.675439+00:00",
             "expiration": "1705708800",
             "order_type": "gtd"
         });
@@ -1724,7 +1726,7 @@ mod authenticated {
         let expected = OpenOrderResponse::builder()
             .id("1")
             .status(OrderStatusType::Live)
-            .owner(Uuid::max())
+            .owner(OPEN_ORDER_OWNER)
             .maker_address(address!("0x2222222222222222222222222222222222222222"))
             .market(b256!(
                 "000000000000000000000000000000000000000000000000006d61726b657461"
@@ -1736,7 +1738,7 @@ mod authenticated {
             .price(dec!(0.45))
             .associate_trades(vec!["0xtradehash1".into(), "0xtradehash2".into()])
             .outcome("YES")
-            .created_at("2024-01-15T12:34:56Z".parse().unwrap())
+            .created_at("2024-01-15T12:34:56.675439Z".parse().unwrap())
             .expiration("2024-01-20T00:00:00Z".parse().unwrap())
             .order_type(OrderType::GTD)
             .build();
@@ -1757,7 +1759,7 @@ mod authenticated {
                 {
                     "id": "1",
                     "status": "LIVE",
-                    "owner": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+                    "owner": OPEN_ORDER_OWNER,
                     "maker_address": "0x2222222222222222222222222222222222222222",
                     "market": "0x000000000000000000000000000000000000000000000000006d61726b657461",
                     "asset_id": token_1(),
@@ -1770,7 +1772,7 @@ mod authenticated {
                         "0xtradehash2"
                     ],
                     "outcome": "YES",
-                    "created_at": 1_705_322_096,
+                    "created_at": "2024-01-15T12:34:56.675439+00:00",
                     "expiration": "1705708800",
                     "order_type": "GTC"
                 }
@@ -1796,7 +1798,7 @@ mod authenticated {
         let order = OpenOrderResponse::builder()
             .id("1")
             .status(OrderStatusType::Live)
-            .owner(Uuid::max())
+            .owner(OPEN_ORDER_OWNER)
             .maker_address(address!("0x2222222222222222222222222222222222222222"))
             .market(b256!(
                 "000000000000000000000000000000000000000000000000006d61726b657461"
@@ -1808,7 +1810,7 @@ mod authenticated {
             .price(dec!(0.45))
             .associate_trades(vec!["0xtradehash1".into(), "0xtradehash2".into()])
             .outcome("YES")
-            .created_at("2024-01-15T12:34:56Z".parse().unwrap())
+            .created_at("2024-01-15T12:34:56.675439Z".parse().unwrap())
             .expiration("2024-01-20T00:00:00Z".parse().unwrap())
             .order_type(OrderType::GTC)
             .build();

@@ -8,7 +8,7 @@ pub use alloy::signers::local::LocalSigner;
 use async_trait::async_trait;
 use base64::Engine as _;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE};
-use hmac::{Hmac, Mac as _};
+use hmac::{Hmac, KeyInit as _, Mac as _};
 use reqwest::header::HeaderMap;
 use reqwest::{Body, Request};
 /// Secret string types that redact values in debug output for security.

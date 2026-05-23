@@ -80,6 +80,82 @@ impl serde_with::SerializeAs<String> for StringFromAny {
     }
 }
 
+#[cfg(feature = "clob")]
+pub(crate) fn deserialize_ulid_string<'de, D>(
+    deserializer: D,
+) -> std::result::Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize as _;
+    use serde::de::Error as _;
+    use ulid::Ulid;
+
+    let value = String::deserialize(deserializer)?;
+    let trimmed = value.trim();
+    let parsed = trimmed
+        .parse::<Ulid>()
+        .map_err(|err| D::Error::custom(format!("invalid ULID: {err}")))?;
+
+    Ok(parsed.to_string())
+}
+
+#[cfg(feature = "clob")]
+pub(crate) fn deserialize_datetime_from_unix_or_rfc3339<'de, D>(
+    deserializer: D,
+) -> std::result::Result<chrono::DateTime<chrono::Utc>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use std::fmt;
+
+    use chrono::{DateTime, Utc};
+    use serde::de::{self, Visitor};
+
+    struct UnixOrRfc3339Visitor;
+
+    impl Visitor<'_> for UnixOrRfc3339Visitor {
+        type Value = DateTime<Utc>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("unix timestamp in seconds or RFC3339 datetime string")
+        }
+
+        fn visit_i64<E>(self, v: i64) -> std::result::Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            DateTime::from_timestamp(v, 0)
+                .ok_or_else(|| E::custom(format!("invalid unix timestamp: {v}")))
+        }
+
+        fn visit_u64<E>(self, v: u64) -> std::result::Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            let value = i64::try_from(v)
+                .map_err(|err| E::custom(format!("unix timestamp out of range: {v}: {err}")))?;
+            self.visit_i64(value)
+        }
+
+        fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            let trimmed = v.trim();
+            if let Ok(seconds) = trimmed.parse::<i64>() {
+                return self.visit_i64(seconds);
+            }
+
+            DateTime::parse_from_rfc3339(trimmed)
+                .map(|datetime| datetime.with_timezone(&Utc))
+                .map_err(E::custom)
+        }
+    }
+
+    deserializer.deserialize_any(UnixOrRfc3339Visitor)
+}
+
 /// Deserialize JSON with unknown field warnings.
 ///
 /// This function deserializes JSON to a target type while detecting and logging
@@ -590,6 +666,39 @@ mod tests {
             let result: StringFromAnyStruct =
                 serde_json::from_value(json).expect("deserialization failed");
             assert_eq!(result.id, "");
+        }
+    }
+
+    // ========== ULID string tests ==========
+    #[cfg(feature = "clob")]
+    mod ulid_string_tests {
+        use serde::Deserialize;
+
+        use super::super::deserialize_ulid_string;
+
+        #[derive(Debug, Deserialize, PartialEq)]
+        struct UlidStringStruct {
+            #[serde(deserialize_with = "deserialize_ulid_string")]
+            owner: String,
+        }
+
+        #[test]
+        fn ulid_string_deserialize_valid() {
+            let json = serde_json::json!({ "owner": "01ARZ3NDEKTSV4RRFFQ69G5FAV" });
+            let result: UlidStringStruct =
+                serde_json::from_value(json).expect("deserialization failed");
+            assert_eq!(result.owner, "01ARZ3NDEKTSV4RRFFQ69G5FAV");
+        }
+
+        #[test]
+        fn ulid_string_rejects_uuid() {
+            let json = serde_json::json!({ "owner": "ffffffff-ffff-ffff-ffff-ffffffffffff" });
+            let err = serde_json::from_value::<UlidStringStruct>(json)
+                .expect_err("deserialization should fail");
+            assert!(
+                err.to_string().contains("invalid ULID"),
+                "unexpected error: {err}"
+            );
         }
     }
 
