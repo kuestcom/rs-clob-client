@@ -3059,7 +3059,7 @@ dependencies = [
  "httpmock",
  "phf",
  "rand 0.9.2",
- "reqwest 0.13.1",
+ "reqwest 0.13.3",
  "rust_decimal",
  "rust_decimal_macros",
  "secrecy",
@@ -3920,9 +3920,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.13.1"
+version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04e9018c9d814e5f30cc16a0f03271aeab3571e609612d9fe78c1aa8d11c2f62"
+checksum = "62e0021ea2c22aed41653bc7e1419abb2c97e038ff2c33d0e1309e49a97deec0"
 dependencies = [
  "base64",
  "bytes",
