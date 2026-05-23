@@ -84,7 +84,7 @@ alloy = { version = "2.0.5", default-features = false, features = [
     "signer-aws",
     "signer-local",
 ] }
-anyhow = "1.0.100"
+anyhow = "1.0.102"
 aws-config = "1.8.12"
 aws-sdk-kms = "1.98.0"
 criterion = { version = "0.8.1", features = ["html_reports"] }
