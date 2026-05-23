@@ -33,7 +33,10 @@ jobs:
         id: auth
 
       - name: Install Rust 1.91.1
-        run: rustup toolchain install 1.91.1 --profile minimal --no-self-update
+        run: |
+          rustup toolchain install 1.91.1 --profile minimal --no-self-update
+          rustup default 1.91.1
+          rustc --version
 
       - name: Run release-plz
         uses: release-plz/action@064f4d1e36c843611ddf013be726beaa4ad804db # v0.5.129
