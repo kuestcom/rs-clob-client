@@ -145,7 +145,7 @@ impl OrderBookSummaryResponse {
         hasher.update(json.as_bytes());
         let result = hasher.finalize();
 
-        Ok(format!("{result:x}"))
+        Ok(alloy::hex::encode(result))
     }
 }
 
