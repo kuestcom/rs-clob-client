@@ -121,28 +121,28 @@ where
             formatter.write_str("unix timestamp in seconds or RFC3339 datetime string")
         }
 
-        fn visit_i64<E>(self, value: i64) -> std::result::Result<Self::Value, E>
+        fn visit_i64<E>(self, v: i64) -> std::result::Result<Self::Value, E>
         where
             E: de::Error,
         {
-            DateTime::from_timestamp(value, 0)
-                .ok_or_else(|| E::custom(format!("invalid unix timestamp: {value}")))
+            DateTime::from_timestamp(v, 0)
+                .ok_or_else(|| E::custom(format!("invalid unix timestamp: {v}")))
         }
 
-        fn visit_u64<E>(self, value: u64) -> std::result::Result<Self::Value, E>
+        fn visit_u64<E>(self, v: u64) -> std::result::Result<Self::Value, E>
         where
             E: de::Error,
         {
-            let value = i64::try_from(value)
-                .map_err(|_| E::custom(format!("unix timestamp out of range: {value}")))?;
+            let value = i64::try_from(v)
+                .map_err(|err| E::custom(format!("unix timestamp out of range: {v}: {err}")))?;
             self.visit_i64(value)
         }
 
-        fn visit_str<E>(self, value: &str) -> std::result::Result<Self::Value, E>
+        fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
         where
             E: de::Error,
         {
-            let trimmed = value.trim();
+            let trimmed = v.trim();
             if let Ok(seconds) = trimmed.parse::<i64>() {
                 return self.visit_i64(seconds);
             }
