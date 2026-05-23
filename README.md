@@ -12,10 +12,10 @@
 use kuest_client_sdk::clob::{Client, Config};
 
 # async fn run() -> kuest_client_sdk::Result<()> {
-let client = Client::new("https://clob.kuest.com", Config::default())?;
-let ok = client.ok().await?;
-println!("{ok}");
-# Ok(())
+    let client = Client::new("https://clob.kuest.com", Config::default())?;
+    let ok = client.ok().await?;
+    println!("{ok}");
+    # Ok(())
 # }
 ```
 
