@@ -1687,6 +1687,45 @@ mod authenticated {
     }
 
     #[tokio::test]
+    async fn post_order_should_accept_order_hash() -> anyhow::Result<()> {
+        let server = MockServer::start();
+        let client = create_authenticated(&server).await?;
+
+        ensure_requirements(&server, token_1(), TickSize::Hundredth);
+
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/order")
+                .header(KUEST_ADDRESS, client.address().to_string().to_lowercase())
+                .header(KUEST_API_KEY, API_KEY)
+                .header(KUEST_PASSPHRASE, PASSPHRASE);
+            then.status(StatusCode::OK).json_body(json!({
+                "error_msg": "",
+                "makingAmount": "100",
+                "orderHash": "0x2369f69af45a559ad6e769d3d209d2379af9d412315e27b9283594a6392557b6",
+                "orderID": "0x23b457271bce9fa09b4f79125c9ec09e968235a462de82e318ef4eb6fe0ffeb0",
+                "status": "matched",
+                "success": true,
+                "takingAmount": "50"
+            }));
+        });
+
+        let signer = LocalSigner::from_str(PRIVATE_KEY)?.with_chain_id(Some(POLYGON));
+        let signed_order = client.sign(&signer, SignableOrder::default()).await?;
+        let response = client.post_order(signed_order).await?;
+
+        assert_eq!(
+            response.order_hash,
+            Some(b256!(
+                "2369f69af45a559ad6e769d3d209d2379af9d412315e27b9283594a6392557b6"
+            ))
+        );
+        mock.assert();
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn order_should_succeed() -> anyhow::Result<()> {
         let server = MockServer::start();
         let client = create_authenticated(&server).await?;
