@@ -1,7 +1,7 @@
 [package]
 name = "kuest-client-sdk"
 description = "Kuest CLOB (Central Limit Order Book) API client SDK"
-version = "2.0.6"
+version = "2.0.7"
 authors = ["Kuest Engineering <engineering@kuest.com>"]
 readme = "README.md"
 repository = "https://github.com/kuestcom/rs-clob-client"

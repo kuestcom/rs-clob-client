@@ -336,6 +336,9 @@ pub struct PostOrderResponse {
     pub taking_amount: Decimal,
     #[serde(rename = "orderID")]
     pub order_id: String,
+    /// Canonical EIP-712 order hash when returned by the engine.
+    #[serde(default, rename = "orderHash")]
+    pub order_hash: Option<B256>,
     pub status: OrderStatusType,
     pub success: bool,
     /// On-chain transaction hashes for the order execution.
