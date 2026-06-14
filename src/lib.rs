@@ -17,6 +17,8 @@ pub mod rtds;
 #[cfg(any(feature = "clob", feature = "gamma"))]
 pub(crate) mod sdk_site_config;
 pub(crate) mod serde_helpers;
+#[cfg(feature = "clob")]
+pub(crate) mod site_scope;
 pub mod types;
 #[cfg(any(feature = "ws", feature = "rtds"))]
 pub mod ws;

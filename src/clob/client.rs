@@ -18,6 +18,7 @@ use dashmap::DashMap;
 use futures::Stream;
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::{Client as ReqwestClient, Method, Request};
+use serde::de::DeserializeOwned;
 use serde_json::json;
 #[cfg(all(feature = "tracing", feature = "heartbeats"))]
 use tracing::{debug, error};
@@ -1084,6 +1085,102 @@ impl<S: State> Client<S> {
         crate::request(&self.inner.client, request, None).await
     }
 
+    async fn request_market_page<T: DeserializeOwned>(
+        &self,
+        path: &str,
+        next_cursor: Option<String>,
+    ) -> Result<Page<T>> {
+        let cursor = next_cursor.map_or(String::new(), |c| format!("?next_cursor={c}"));
+        let request = self
+            .client()
+            .request(Method::GET, format!("{}{path}{cursor}", self.host()))
+            .build()?;
+
+        crate::request(&self.inner.client, request, None).await
+    }
+
+    async fn site_scoped_market_page<T, IsAllowed>(
+        &self,
+        path: &str,
+        next_cursor: Option<String>,
+        mut is_allowed: IsAllowed,
+    ) -> Result<Page<T>>
+    where
+        T: Clone + DeserializeOwned,
+        IsAllowed: FnMut(&T, &crate::site_scope::SiteMarketScope) -> bool,
+    {
+        if !crate::site_scope::has_configured_site_scope() {
+            return self.request_market_page(path, next_cursor).await;
+        }
+
+        let mut cursor = next_cursor;
+        loop {
+            let page = self.request_market_page(path, cursor.clone()).await?;
+            let scope = crate::site_scope::get_site_market_scope(&self.inner.client).await?;
+            let next = page.next_cursor.clone();
+            let limit = page.limit;
+
+            if scope.is_empty() {
+                return Ok(Page {
+                    data: Vec::new(),
+                    next_cursor: next,
+                    limit,
+                    count: 0,
+                });
+            }
+
+            let filtered = page
+                .data
+                .into_iter()
+                .filter(|market| is_allowed(market, &scope))
+                .collect::<Vec<_>>();
+            let count = u64::try_from(filtered.len()).unwrap_or(u64::MAX);
+            let scoped_page = Page {
+                data: filtered,
+                next_cursor: next.clone(),
+                limit,
+                count,
+            };
+
+            if !scoped_page.data.is_empty()
+                || next == TERMINAL_CURSOR
+                || cursor.as_deref() == Some(next.as_str())
+            {
+                return Ok(scoped_page);
+            }
+
+            cursor = Some(next);
+        }
+    }
+
+    fn market_response_allowed(
+        market: &MarketResponse,
+        scope: &crate::site_scope::SiteMarketScope,
+    ) -> bool {
+        market
+            .condition_id
+            .as_ref()
+            .is_some_and(|condition_id| crate::site_scope::condition_allowed(scope, condition_id))
+            || market
+                .tokens
+                .iter()
+                .any(|token| crate::site_scope::token_allowed(scope, &token.token_id))
+    }
+
+    fn simplified_market_response_allowed(
+        market: &SimplifiedMarketResponse,
+        scope: &crate::site_scope::SiteMarketScope,
+    ) -> bool {
+        market
+            .condition_id
+            .as_ref()
+            .is_some_and(|condition_id| crate::site_scope::condition_allowed(scope, condition_id))
+            || market
+                .tokens
+                .iter()
+                .any(|token| crate::site_scope::token_allowed(scope, &token.token_id))
+    }
+
     /// Retrieves detailed information for a single market by condition ID.
     ///
     /// Returns comprehensive market data including all outcome tokens, current prices,
@@ -1114,13 +1211,8 @@ impl<S: State> Client<S> {
     ///
     /// Returns an error if the request fails.
     pub async fn markets(&self, next_cursor: Option<String>) -> Result<Page<MarketResponse>> {
-        let cursor = next_cursor.map_or(String::new(), |c| format!("?next_cursor={c}"));
-        let request = self
-            .client()
-            .request(Method::GET, format!("{}markets{cursor}", self.host()))
-            .build()?;
-
-        crate::request(&self.inner.client, request, None).await
+        self.site_scoped_market_page("markets", next_cursor, Self::market_response_allowed)
+            .await
     }
 
     /// Retrieves a page of sampling markets.
@@ -1136,16 +1228,12 @@ impl<S: State> Client<S> {
         &self,
         next_cursor: Option<String>,
     ) -> Result<Page<MarketResponse>> {
-        let cursor = next_cursor.map_or(String::new(), |c| format!("?next_cursor={c}"));
-        let request = self
-            .client()
-            .request(
-                Method::GET,
-                format!("{}sampling-markets{cursor}", self.host()),
-            )
-            .build()?;
-
-        crate::request(&self.inner.client, request, None).await
+        self.site_scoped_market_page(
+            "sampling-markets",
+            next_cursor,
+            Self::market_response_allowed,
+        )
+        .await
     }
 
     /// Retrieves a page of simplified market data.
@@ -1161,16 +1249,12 @@ impl<S: State> Client<S> {
         &self,
         next_cursor: Option<String>,
     ) -> Result<Page<SimplifiedMarketResponse>> {
-        let cursor = next_cursor.map_or(String::new(), |c| format!("?next_cursor={c}"));
-        let request = self
-            .client()
-            .request(
-                Method::GET,
-                format!("{}simplified-markets{cursor}", self.host()),
-            )
-            .build()?;
-
-        crate::request(&self.inner.client, request, None).await
+        self.site_scoped_market_page(
+            "simplified-markets",
+            next_cursor,
+            Self::simplified_market_response_allowed,
+        )
+        .await
     }
 
     /// Retrieves a page of simplified sampling market data.
@@ -1186,16 +1270,12 @@ impl<S: State> Client<S> {
         &self,
         next_cursor: Option<String>,
     ) -> Result<Page<SimplifiedMarketResponse>> {
-        let cursor = next_cursor.map_or(String::new(), |c| format!("?next_cursor={c}"));
-        let request = self
-            .client()
-            .request(
-                Method::GET,
-                format!("{}sampling-simplified-markets{cursor}", self.host()),
-            )
-            .build()?;
-
-        crate::request(&self.inner.client, request, None).await
+        self.site_scoped_market_page(
+            "sampling-simplified-markets",
+            next_cursor,
+            Self::simplified_market_response_allowed,
+        )
+        .await
     }
 
     /// Returns a stream of results, using `self` to repeatedly invoke the provided closure,
