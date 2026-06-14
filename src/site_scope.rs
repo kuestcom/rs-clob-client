@@ -107,6 +107,18 @@ fn add_token_id(scope: &mut SiteMarketScope, value: Option<&Value>) {
     }
 }
 
+fn collect_token_scope(value: &Value, scope: &mut SiteMarketScope) {
+    match value {
+        Value::Array(items) => {
+            for item in items {
+                collect_token_scope(item, scope);
+            }
+        }
+        Value::Object(_) => collect_market_scope(value, scope),
+        _ => add_token_id(scope, Some(value)),
+    }
+}
+
 fn collect_market_scope(value: &Value, scope: &mut SiteMarketScope) {
     match value {
         Value::Array(items) => {
@@ -126,17 +138,20 @@ fn collect_market_scope(value: &Value, scope: &mut SiteMarketScope) {
             add_token_id(scope, object.get("assetId"));
             add_token_id(scope, object.get("t"));
 
+            for key in ["markets", "outcomes", "tokens"] {
+                if let Some(child) = object.get(key) {
+                    collect_market_scope(child, scope);
+                }
+            }
+
             for key in [
-                "markets",
-                "outcomes",
-                "tokens",
                 "clob_token_ids",
                 "clobTokenIds",
                 "outcome_assets",
                 "outcomeAssets",
             ] {
                 if let Some(child) = object.get(key) {
-                    collect_market_scope(child, scope);
+                    collect_token_scope(child, scope);
                 }
             }
         }

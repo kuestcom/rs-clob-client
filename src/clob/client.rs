@@ -1118,12 +1118,18 @@ impl<S: State> Client<S> {
             let page = self.request_market_page(path, cursor.clone()).await?;
             let scope = crate::site_scope::get_site_market_scope(&self.inner.client).await?;
             let next = page.next_cursor.clone();
+            let stalled_cursor = cursor.as_deref() == Some(next.as_str());
+            let returned_cursor = if stalled_cursor {
+                TERMINAL_CURSOR.to_owned()
+            } else {
+                next.clone()
+            };
             let limit = page.limit;
 
             if scope.is_empty() {
                 return Ok(Page {
                     data: Vec::new(),
-                    next_cursor: next,
+                    next_cursor: returned_cursor,
                     limit,
                     count: 0,
                 });
@@ -1137,15 +1143,12 @@ impl<S: State> Client<S> {
             let count = u64::try_from(filtered.len()).unwrap_or(u64::MAX);
             let scoped_page = Page {
                 data: filtered,
-                next_cursor: next.clone(),
+                next_cursor: returned_cursor,
                 limit,
                 count,
             };
 
-            if !scoped_page.data.is_empty()
-                || next == TERMINAL_CURSOR
-                || cursor.as_deref() == Some(next.as_str())
-            {
+            if !scoped_page.data.is_empty() || next == TERMINAL_CURSOR || stalled_cursor {
                 return Ok(scoped_page);
             }
 
