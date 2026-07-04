@@ -3,7 +3,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use alloy::primitives::{B256, U256};
 use alloy::signers::Signer;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use rand::RngExt as _;
 use rust_decimal::prelude::ToPrimitive as _;
 
@@ -22,6 +22,7 @@ use crate::types::{Address, Decimal};
 
 /// Maximum number of decimal places for `size`
 pub(crate) const LOT_SIZE_SCALE: u32 = 2;
+pub(crate) const MIN_GTD_EXPIRATION_SECONDS: i64 = 3 * 60;
 
 /// Placeholder type for compile-time checks on limit order builders
 #[non_exhaustive]
@@ -254,6 +255,15 @@ impl<K: AuthKind> OrderBuilder<Limit, K> {
             return Err(Error::validation(
                 "Only GTD orders may have a non-zero expiration",
             ));
+        }
+
+        if matches!(order_type, OrderType::GTD) {
+            let minimum_expiration = Utc::now() + TimeDelta::seconds(MIN_GTD_EXPIRATION_SECONDS);
+            if expiration < minimum_expiration {
+                return Err(Error::validation(
+                    "GTD expiration must be at least 3 minutes in the future",
+                ));
+            }
         }
 
         if post_only == Some(true) && !matches!(order_type, OrderType::GTC | OrderType::GTD) {
