@@ -9,7 +9,7 @@ mod common;
 use std::str::FromStr as _;
 
 use alloy::primitives::U256;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use httpmock::MockServer;
 use kuest_client_sdk::clob::types::response::OrderSummary;
 use kuest_client_sdk::clob::types::{Amount, OrderType, Side, SignatureType, TickSize};
@@ -20,6 +20,12 @@ use rust_decimal_macros::dec;
 use crate::common::{
     USDC_DECIMALS, create_authenticated, ensure_requirements, to_decimal, token_1, token_2,
 };
+
+const FUTURE_GTD_EXPIRATION_SECONDS: u64 = 32_503_680_000;
+
+fn future_gtd_expiration() -> DateTime<Utc> {
+    DateTime::<Utc>::from_str("3000-01-01T00:00:00Z").unwrap()
+}
 
 /// Tests for the lifecycle of a [`Client`] as it moves from [`Unauthenticated`] to [`Authenticated`]
 mod lifecycle {
@@ -490,6 +496,34 @@ mod limit {
     }
 
     #[tokio::test]
+    async fn should_fail_on_short_gtd_expiration() -> anyhow::Result<()> {
+        let server = MockServer::start();
+        let client = create_authenticated(&server).await?;
+
+        ensure_requirements(&server, token_1(), TickSize::Tenth);
+
+        let err = client
+            .limit_order()
+            .token_id(token_1())
+            .price(dec!(0.5))
+            .size(dec!(21.04))
+            .side(Side::Buy)
+            .order_type(OrderType::GTD)
+            .expiration(Utc::now() + TimeDelta::seconds(60))
+            .build()
+            .await
+            .unwrap_err();
+        let msg = &err.downcast_ref::<Validation>().unwrap().reason;
+
+        assert_eq!(
+            msg,
+            "GTD expiration must be at least 3 minutes in the future"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn should_fail_on_post_only_for_non_gtc_gtd() -> anyhow::Result<()> {
         let server = MockServer::start();
         let client = create_authenticated(&server).await?;
@@ -632,7 +666,7 @@ mod limit {
                 .size(dec!(21.04))
                 .side(Side::Buy)
                 .order_type(OrderType::GTD)
-                .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
+                .expiration(future_gtd_expiration())
                 .build()
                 .await?;
 
@@ -647,7 +681,10 @@ mod limit {
             assert_eq!(signable_order.order().tokenId, token_1());
             assert_eq!(signable_order.order().makerAmount, U256::from(10_520_000));
             assert_eq!(signable_order.order().takerAmount, U256::from(21_040_000));
-            assert_eq!(signable_order.v2().expiration, U256::from(50000));
+            assert_eq!(
+                signable_order.v2().expiration,
+                U256::from(FUTURE_GTD_EXPIRATION_SECONDS)
+            );
             assert_ne!(signable_order.order().salt, U256::ZERO);
             assert_eq!(signable_order.order().side, Side::Buy as u8);
             assert_eq!(
@@ -672,7 +709,7 @@ mod limit {
                 .size(dec!(21.04))
                 .side(Side::Buy)
                 .order_type(OrderType::GTD)
-                .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
+                .expiration(future_gtd_expiration())
                 .build()
                 .await?;
 
@@ -687,7 +724,10 @@ mod limit {
             assert_eq!(signable_order.order().tokenId, token_1());
             assert_eq!(signable_order.order().makerAmount, U256::from(11_782_400));
             assert_eq!(signable_order.order().takerAmount, U256::from(21_040_000));
-            assert_eq!(signable_order.v2().expiration, U256::from(50000));
+            assert_eq!(
+                signable_order.v2().expiration,
+                U256::from(FUTURE_GTD_EXPIRATION_SECONDS)
+            );
             assert_ne!(signable_order.order().salt, U256::ZERO);
             assert_eq!(signable_order.order().side, Side::Buy as u8);
             assert_eq!(
@@ -712,7 +752,7 @@ mod limit {
                 .size(dec!(21.04))
                 .side(Side::Buy)
                 .order_type(OrderType::GTD)
-                .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
+                .expiration(future_gtd_expiration())
                 .build()
                 .await?;
 
@@ -727,7 +767,10 @@ mod limit {
             assert_eq!(signable_order.order().tokenId, token_1());
             assert_eq!(signable_order.order().makerAmount, U256::from(1_178_240));
             assert_eq!(signable_order.order().takerAmount, U256::from(21_040_000));
-            assert_eq!(signable_order.v2().expiration, U256::from(50000));
+            assert_eq!(
+                signable_order.v2().expiration,
+                U256::from(FUTURE_GTD_EXPIRATION_SECONDS)
+            );
             assert_ne!(signable_order.order().salt, U256::ZERO);
             assert_eq!(signable_order.order().side, Side::Buy as u8);
             assert_eq!(
@@ -752,7 +795,7 @@ mod limit {
                 .size(dec!(21.04))
                 .side(Side::Buy)
                 .order_type(OrderType::GTD)
-                .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
+                .expiration(future_gtd_expiration())
                 .build()
                 .await?;
 
@@ -767,7 +810,10 @@ mod limit {
             assert_eq!(signable_order.order().tokenId, token_1());
             assert_eq!(signable_order.order().makerAmount, U256::from(117_824));
             assert_eq!(signable_order.order().takerAmount, U256::from(21_040_000));
-            assert_eq!(signable_order.v2().expiration, U256::from(50000));
+            assert_eq!(
+                signable_order.v2().expiration,
+                U256::from(FUTURE_GTD_EXPIRATION_SECONDS)
+            );
             assert_ne!(signable_order.order().salt, U256::ZERO);
             assert_eq!(signable_order.order().side, Side::Buy as u8);
             assert_eq!(
@@ -894,7 +940,7 @@ mod limit {
                 .size(dec!(21.04))
                 .side(Side::Sell)
                 .order_type(OrderType::GTD)
-                .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
+                .expiration(future_gtd_expiration())
                 .build()
                 .await?;
 
@@ -909,7 +955,10 @@ mod limit {
             assert_eq!(signable_order.order().tokenId, token_1());
             assert_eq!(signable_order.order().makerAmount, U256::from(21_040_000));
             assert_eq!(signable_order.order().takerAmount, U256::from(10_520_000));
-            assert_eq!(signable_order.v2().expiration, U256::from(50000));
+            assert_eq!(
+                signable_order.v2().expiration,
+                U256::from(FUTURE_GTD_EXPIRATION_SECONDS)
+            );
             assert_ne!(signable_order.order().salt, U256::ZERO);
             assert_eq!(signable_order.order().side, Side::Sell as u8);
             assert_eq!(
@@ -934,7 +983,7 @@ mod limit {
                 .size(dec!(21.04))
                 .side(Side::Sell)
                 .order_type(OrderType::GTD)
-                .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
+                .expiration(future_gtd_expiration())
                 .build()
                 .await?;
 
@@ -949,7 +998,10 @@ mod limit {
             assert_eq!(signable_order.order().tokenId, token_1());
             assert_eq!(signable_order.order().makerAmount, U256::from(21_040_000));
             assert_eq!(signable_order.order().takerAmount, U256::from(11_782_400));
-            assert_eq!(signable_order.v2().expiration, U256::from(50000));
+            assert_eq!(
+                signable_order.v2().expiration,
+                U256::from(FUTURE_GTD_EXPIRATION_SECONDS)
+            );
             assert_ne!(signable_order.order().salt, U256::ZERO);
             assert_eq!(signable_order.order().side, Side::Sell as u8);
             assert_eq!(
@@ -974,7 +1026,7 @@ mod limit {
                 .size(dec!(21.04))
                 .side(Side::Sell)
                 .order_type(OrderType::GTD)
-                .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
+                .expiration(future_gtd_expiration())
                 .build()
                 .await?;
 
@@ -989,7 +1041,10 @@ mod limit {
             assert_eq!(signable_order.order().tokenId, token_1());
             assert_eq!(signable_order.order().makerAmount, U256::from(21_040_000));
             assert_eq!(signable_order.order().takerAmount, U256::from(1_178_240));
-            assert_eq!(signable_order.v2().expiration, U256::from(50000));
+            assert_eq!(
+                signable_order.v2().expiration,
+                U256::from(FUTURE_GTD_EXPIRATION_SECONDS)
+            );
             assert_ne!(signable_order.order().salt, U256::ZERO);
             assert_eq!(signable_order.order().side, Side::Sell as u8);
             assert_eq!(
@@ -1014,7 +1069,7 @@ mod limit {
                 .size(dec!(21.04))
                 .side(Side::Sell)
                 .order_type(OrderType::GTD)
-                .expiration(DateTime::<Utc>::from_str("1970-01-01T13:53:20Z").unwrap())
+                .expiration(future_gtd_expiration())
                 .build()
                 .await?;
 
@@ -1029,7 +1084,10 @@ mod limit {
             assert_eq!(signable_order.order().tokenId, token_1());
             assert_eq!(signable_order.order().makerAmount, U256::from(21_040_000));
             assert_eq!(signable_order.order().takerAmount, U256::from(117_824));
-            assert_eq!(signable_order.v2().expiration, U256::from(50000));
+            assert_eq!(
+                signable_order.v2().expiration,
+                U256::from(FUTURE_GTD_EXPIRATION_SECONDS)
+            );
             assert_ne!(signable_order.order().salt, U256::ZERO);
             assert_eq!(signable_order.order().side, Side::Sell as u8);
             assert_eq!(
