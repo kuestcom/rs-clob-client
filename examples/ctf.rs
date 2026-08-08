@@ -39,7 +39,7 @@ use kuest_client_sdk::types::address;
 use kuest_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
 use tracing::{error, info};
 
-const RPC_URL: &str = "https://polygon-rpc.com";
+const RPC_URL: &str = "https://polygon.drpc.org";
 
 #[tokio::main]
 async fn main() -> Result<()> {

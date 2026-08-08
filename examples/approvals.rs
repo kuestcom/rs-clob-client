@@ -48,7 +48,7 @@ use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt as _;
 use tracing_subscriber::util::SubscriberInitExt as _;
 
-const RPC_URL: &str = "https://polygon-rpc.com";
+const RPC_URL: &str = "https://polygon.drpc.org";
 
 sol! {
     #[sol(rpc)]

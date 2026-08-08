@@ -17,7 +17,7 @@
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let provider = ProviderBuilder::new()
-//!     .connect("https://polygon-rpc.com")
+//!     .connect("https://polygon.drpc.org")
 //!     .await?;
 //!
 //! let client = Client::new(provider, 137)?;
