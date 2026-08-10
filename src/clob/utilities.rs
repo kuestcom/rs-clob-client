@@ -188,11 +188,18 @@ pub fn adjust_market_buy_amount(
     fee_exponent: Decimal,
     builder_taker_fee_rate: Decimal,
 ) -> Result<Decimal> {
+    if price <= Decimal::ZERO || price >= Decimal::ONE {
+        return Err(Error::validation(format!(
+            "price {price} must be between 0 and 1 for dynamic fee calculation"
+        )));
+    }
     let base = price * (Decimal::ONE - price);
-    let base_f64: f64 = base.try_into().unwrap_or(0.0);
-    let exp_f64: f64 = fee_exponent.try_into().unwrap_or(0.0);
-    let platform_fee_rate =
-        fee_rate * Decimal::try_from(base_f64.powf(exp_f64)).unwrap_or(Decimal::ZERO);
+    let exponent = u32::try_from(fee_exponent).map_err(|_| {
+        Error::validation(format!(
+            "fee exponent {fee_exponent} must be a non-negative integer"
+        ))
+    })?;
+    let platform_fee_rate = fee_rate * decimal_pow(base, exponent)?;
 
     let platform_fee = amount / price * platform_fee_rate;
     let total_cost = amount + platform_fee + amount * builder_taker_fee_rate;
@@ -213,6 +220,16 @@ pub fn adjust_market_buy_amount(
         )));
     }
     Ok(adjusted)
+}
+
+fn decimal_pow(base: Decimal, exponent: u32) -> Result<Decimal> {
+    let mut value = Decimal::ONE;
+    for _ in 0..exponent {
+        value = value
+            .checked_mul(base)
+            .ok_or_else(|| Error::validation("dynamic fee calculation overflow"))?;
+    }
+    Ok(value)
 }
 
 /// Validates that a price is within the valid range `[tick_size, 1 - tick_size]`.
@@ -493,10 +510,7 @@ mod tests {
     /// `platform_fee = (amount / price) × rate × (price × (1 − price))^exponent`.
     fn calc_platform_fee(amount: Decimal, price: Decimal, rate: Decimal, exponent: u32) -> Decimal {
         let base = price * (Decimal::ONE - price);
-        let base_f64 = f64::try_from(base).unwrap_or(0.0);
-        let rate_factor = rate
-            * Decimal::try_from(base_f64.powi(i32::try_from(exponent).unwrap_or(0)))
-                .unwrap_or(Decimal::ZERO);
+        let rate_factor = rate * decimal_pow(base, exponent).unwrap();
         (amount / price) * rate_factor
     }
 
@@ -670,26 +684,26 @@ mod tests {
     }
 
     // Production V2 fee tiers (all exp=1):
-    //   sports          rate=0.03
+    //   sports          rate=0.05
     //   politics family rate=0.04  (politics, tech, finance_prices, mentions)
     //   culture family  rate=0.05  (culture, weather, general, economics)
-    //   crypto          rate=0.072
+    //   crypto          rate=0.07
 
     #[test]
     fn production_fee_sports_v2() {
         close_to(
-            calc_platform_fee(dec!(100), dec!(0.5), dec!(0.03), 1),
+            calc_platform_fee(dec!(100), dec!(0.5), dec!(0.05), 1),
+            dec!(2.5),
+            dec!(0.000001),
+        );
+        close_to(
+            calc_platform_fee(dec!(100), dec!(0.3), dec!(0.05), 1),
+            dec!(3.5),
+            dec!(0.000001),
+        );
+        close_to(
+            calc_platform_fee(dec!(100), dec!(0.7), dec!(0.05), 1),
             dec!(1.5),
-            dec!(0.000001),
-        );
-        close_to(
-            calc_platform_fee(dec!(100), dec!(0.3), dec!(0.03), 1),
-            dec!(2.1),
-            dec!(0.000001),
-        );
-        close_to(
-            calc_platform_fee(dec!(100), dec!(0.7), dec!(0.03), 1),
-            dec!(0.9),
             dec!(0.000001),
         );
     }
@@ -736,22 +750,32 @@ mod tests {
 
     #[test]
     fn production_fee_crypto_v2() {
-        // rate=0.072, exp=1
+        // rate=0.07, exp=1
         close_to(
-            calc_platform_fee(dec!(100), dec!(0.5), dec!(0.072), 1),
-            dec!(3.6),
+            calc_platform_fee(dec!(100), dec!(0.5), dec!(0.07), 1),
+            dec!(3.5),
             dec!(0.000001),
         );
         close_to(
-            calc_platform_fee(dec!(100), dec!(0.3), dec!(0.072), 1),
-            dec!(5.04),
+            calc_platform_fee(dec!(100), dec!(0.3), dec!(0.07), 1),
+            dec!(4.9),
             dec!(0.000001),
         );
         close_to(
-            calc_platform_fee(dec!(100), dec!(0.7), dec!(0.072), 1),
-            dec!(2.16),
+            calc_platform_fee(dec!(100), dec!(0.7), dec!(0.07), 1),
+            dec!(2.1),
             dec!(0.000001),
         );
+    }
+
+    #[test]
+    fn production_fee_geopolitics_is_zero() {
+        for price in [dec!(0.3), dec!(0.5), dec!(0.7)] {
+            assert_eq!(
+                calc_platform_fee(dec!(100), price, Decimal::ZERO, 1),
+                Decimal::ZERO
+            );
+        }
     }
 
     #[test]
@@ -759,11 +783,12 @@ mod tests {
         // For every production tier at prices {0.3, 0.5, 0.7}, `adjust + fee ≈ amount`
         // when `balance == amount` (i.e. the budget is fully consumed).
         let amount = dec!(100);
-        let tiers: [(&str, Decimal, u32); 4] = [
-            ("sports_v2", dec!(0.03), 1),
+        let tiers: [(&str, Decimal, u32); 5] = [
+            ("sports_v2", dec!(0.05), 1),
             ("politics_family", dec!(0.04), 1),
             ("culture_family", dec!(0.05), 1),
-            ("crypto_v2", dec!(0.072), 1),
+            ("crypto_v2", dec!(0.07), 1),
+            ("geopolitics", dec!(0), 1),
         ];
         let prices = [dec!(0.3), dec!(0.5), dec!(0.7)];
         for (name, rate, exponent) in tiers {
