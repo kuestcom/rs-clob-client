@@ -194,9 +194,9 @@ pub fn adjust_market_buy_amount(
         )));
     }
     let base = price * (Decimal::ONE - price);
-    let exponent = u32::try_from(fee_exponent).map_err(|_| {
+    let exponent = u32::try_from(fee_exponent).map_err(|error| {
         Error::validation(format!(
-            "fee exponent {fee_exponent} must be a non-negative integer"
+            "fee exponent {fee_exponent} must be a non-negative integer: {error}"
         ))
     })?;
     let platform_fee_rate = fee_rate * decimal_pow(base, exponent)?;
