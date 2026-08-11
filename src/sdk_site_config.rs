@@ -43,8 +43,16 @@ fn load_site_config() -> SiteConfig {
         Err(error) => panic!("failed to read {}: {error}", path.display()),
     };
 
-    serde_json::from_str(&contents)
-        .unwrap_or_else(|error| panic!("invalid {}: {error}", path.display()))
+    let config: SiteConfig = serde_json::from_str(&contents)
+        .unwrap_or_else(|error| panic!("invalid {}: {error}", path.display()));
+    let builder_code = config.builder_code.trim();
+    if config.builder_mode && (builder_code.is_empty() || builder_code == ZERO_BYTES32) {
+        panic!(
+            "invalid {}: builder_mode requires a non-zero builder_code",
+            path.display()
+        );
+    }
+    config
 }
 
 pub(crate) fn site_config() -> &'static SiteConfig {

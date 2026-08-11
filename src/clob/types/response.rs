@@ -822,12 +822,15 @@ pub struct ClobMarketInfoResponse {
 
 #[non_exhaustive]
 #[derive(Clone, Debug, Deserialize, Builder, PartialEq)]
-#[serde(rename_all = "camelCase")]
 pub struct BuilderFeeRateResponse {
-    #[serde(alias = "builder_maker_fee_rate_bps")]
-    pub builder_maker_fee_rate_bps: u32,
-    #[serde(alias = "builder_taker_fee_rate_bps")]
-    pub builder_taker_fee_rate_bps: u32,
+    #[serde(default)]
+    pub builder_maker_flat_fee_bps: u32,
+    #[serde(default = "default_builder_taker_fee_share_bps")]
+    pub builder_taker_fee_share_bps: u32,
+}
+
+const fn default_builder_taker_fee_share_bps() -> u32 {
+    3_000
 }
 
 /// Response from creating an RFQ request.

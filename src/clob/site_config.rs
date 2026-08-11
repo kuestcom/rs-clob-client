@@ -10,7 +10,8 @@ fn parse_b256(value: Option<String>) -> Option<B256> {
         return None;
     }
 
-    let parsed = B256::from_str(trimmed).ok()?;
+    let parsed = B256::from_str(trimmed)
+        .unwrap_or_else(|error| panic!("invalid bytes32 value in .sdk/site-config.json: {error}"));
     if parsed == B256::ZERO {
         return None;
     }

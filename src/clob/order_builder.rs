@@ -498,13 +498,10 @@ impl<K: AuthKind> OrderBuilder<Market, K> {
                 let fee = self.client.fee_info(token_id).await?;
                 let fee_rate = fee.rate;
                 let fee_exponent = Decimal::from(fee.exponent);
-                let builder_taker_fee = match self.builder_code {
-                    Some(code) if code != B256::ZERO => {
-                        let rate = self.client.builder_fee_rate(code).await?;
-                        Decimal::from(rate.builder_taker_fee_rate_bps) / Decimal::from(10_000_u32)
-                    }
-                    _ => Decimal::ZERO,
-                };
+                let builder_code = self.builder_code.unwrap_or(B256::ZERO);
+                let rate = self.client.builder_fee_rate(builder_code).await?;
+                let builder_taker_share =
+                    Decimal::from(rate.builder_taker_fee_share_bps) / Decimal::from(10_000_u32);
 
                 let adjusted = super::utilities::adjust_market_buy_amount(
                     raw,
@@ -512,7 +509,7 @@ impl<K: AuthKind> OrderBuilder<Market, K> {
                     price,
                     fee_rate,
                     fee_exponent,
-                    builder_taker_fee,
+                    builder_taker_share,
                 )?;
                 Amount::usdc(adjusted)?
             }

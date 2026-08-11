@@ -2,7 +2,8 @@
 
 use std::fmt::Write as _;
 
-use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive as _;
+use rust_decimal::{Decimal, RoundingStrategy};
 use rust_decimal_macros::dec;
 use sha1::Digest as _;
 
@@ -14,6 +15,73 @@ use crate::error::Error;
 /// Number of decimal places in a USDC amount on-chain. Exposed so utility callers can
 /// use the same truncation semantics.
 pub const USDC_DECIMALS: u32 = 6;
+const FEE_DECIMALS: u32 = 5;
+
+/// Exact single-fill fee components produced by the Kuest curve and Exchange split.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DynamicFeeBreakdown {
+    pub kuest_fee_base: Decimal,
+    pub kuest_fee: Decimal,
+    pub operator_fee: Decimal,
+    pub total_fee: Decimal,
+}
+
+/// Mirrors CLOB five-decimal rounding and the Exchange's integer-USDC operator split.
+pub fn calculate_dynamic_fee_breakdown(
+    shares: Decimal,
+    price: Decimal,
+    fee_rate: Decimal,
+    fee_exponent: Decimal,
+    builder_taker_fee_share_bps: u32,
+) -> Result<DynamicFeeBreakdown> {
+    if price <= Decimal::ZERO || price >= Decimal::ONE {
+        return Err(Error::validation(format!(
+            "price {price} must be between 0 and 1 for dynamic fee calculation"
+        )));
+    }
+    if builder_taker_fee_share_bps >= 10_000 {
+        return Err(Error::validation(
+            "builder_taker_fee_share_bps must be between 0 and 9999",
+        ));
+    }
+    let exponent = u32::try_from(fee_exponent).map_err(|_| {
+        Error::validation(format!(
+            "fee exponent {fee_exponent} must be a non-negative integer"
+        ))
+    })?;
+    let raw_base = shares
+        .checked_mul(fee_rate)
+        .and_then(|value| {
+            value.checked_mul(decimal_pow(price * (Decimal::ONE - price), exponent).ok()?)
+        })
+        .ok_or_else(|| Error::validation("dynamic fee calculation overflow"))?;
+    if raw_base < dec!(0.00001) {
+        return Ok(DynamicFeeBreakdown {
+            kuest_fee_base: Decimal::ZERO,
+            kuest_fee: Decimal::ZERO,
+            operator_fee: Decimal::ZERO,
+            total_fee: Decimal::ZERO,
+        });
+    }
+
+    let kuest_fee_base =
+        raw_base.round_dp_with_strategy(FEE_DECIMALS, RoundingStrategy::MidpointAwayFromZero);
+    let total_fee = (kuest_fee_base * Decimal::from(10_000_u32)
+        / Decimal::from(10_000_u32 - builder_taker_fee_share_bps))
+    .round_dp_with_strategy(FEE_DECIMALS, RoundingStrategy::ToPositiveInfinity);
+    let total_micro_usdc = (total_fee * Decimal::from(1_000_000_u32))
+        .to_u64()
+        .ok_or_else(|| Error::validation("total fee does not fit in USDC units"))?;
+    let operator_micro_usdc = total_micro_usdc * u64::from(builder_taker_fee_share_bps) / 10_000;
+    let usdc_scale = Decimal::from(1_000_000_u32);
+
+    Ok(DynamicFeeBreakdown {
+        kuest_fee_base,
+        kuest_fee: Decimal::from(total_micro_usdc - operator_micro_usdc) / usdc_scale,
+        operator_fee: Decimal::from(operator_micro_usdc) / usdc_scale,
+        total_fee: Decimal::from(total_micro_usdc) / usdc_scale,
+    })
+}
 
 /// Walks orderbook levels best-to-worst, accumulating via `accumulate`, and returns
 /// the cutoff price where cumulative ≥ `target`.
@@ -169,7 +237,7 @@ pub fn orderbook_summary_hash(orderbook: &OrderBookSummaryResponse) -> String {
     alloy::hex::encode(result)
 }
 
-/// Adjusts a market-buy USDC amount to account for platform and builder taker fees.
+/// Adjusts a market-buy USDC amount for the grossed-up dynamic taker fee.
 ///
 /// Returns `amount` unchanged when `user_usdc_balance` already covers the total cost.
 /// Otherwise shrinks it so principal + fees = balance, then truncates to [`USDC_DECIMALS`]
@@ -186,40 +254,64 @@ pub fn adjust_market_buy_amount(
     price: Decimal,
     fee_rate: Decimal,
     fee_exponent: Decimal,
-    builder_taker_fee_rate: Decimal,
+    builder_taker_fee_share: Decimal,
 ) -> Result<Decimal> {
     if price <= Decimal::ZERO || price >= Decimal::ONE {
         return Err(Error::validation(format!(
             "price {price} must be between 0 and 1 for dynamic fee calculation"
         )));
     }
-    let base = price * (Decimal::ONE - price);
-    let exponent = u32::try_from(fee_exponent).map_err(|_| {
-        Error::validation(format!(
-            "fee exponent {fee_exponent} must be a non-negative integer"
-        ))
-    })?;
-    let platform_fee_rate = fee_rate * decimal_pow(base, exponent)?;
-
-    let platform_fee = amount / price * platform_fee_rate;
-    let total_cost = amount + platform_fee + amount * builder_taker_fee_rate;
-
-    // `<=` matches the TS client at the exact-equality boundary.
-    let raw = if user_usdc_balance <= total_cost {
-        let divisor = Decimal::ONE + platform_fee_rate / price + builder_taker_fee_rate;
-        user_usdc_balance / divisor
-    } else {
-        amount
+    let share_bps_decimal = builder_taker_fee_share * Decimal::from(10_000_u32);
+    let builder_share_bps = share_bps_decimal
+        .to_u32()
+        .ok_or_else(|| Error::validation("builder taker fee share must be between 0 and 0.9999"))?;
+    if Decimal::from(builder_share_bps) != share_bps_decimal || builder_share_bps >= 10_000 {
+        return Err(Error::validation(
+            "builder taker fee share must have whole-bps precision between 0 and 0.9999",
+        ));
+    }
+    let fee_for_amount = |principal: Decimal| -> Result<Decimal> {
+        Ok(calculate_dynamic_fee_breakdown(
+            principal / price,
+            price,
+            fee_rate,
+            fee_exponent,
+            builder_share_bps,
+        )?
+        .total_fee)
     };
+    if amount + fee_for_amount(amount)? <= user_usdc_balance {
+        return Ok(amount);
+    }
 
-    let adjusted = raw.trunc_with_scale(USDC_DECIMALS);
-    if adjusted.is_zero() {
+    let scale = Decimal::from(1_000_000_u32);
+    let high_decimal = amount.min(user_usdc_balance) * scale;
+    let mut high = high_decimal
+        .trunc()
+        .to_u64()
+        .ok_or_else(|| Error::validation("market-buy amount does not fit in USDC units"))?;
+    let mut low = 0_u64;
+    let mut best = 0_u64;
+    while low <= high {
+        let mid = low + (high - low) / 2;
+        let principal = Decimal::from(mid) / scale;
+        if principal + fee_for_amount(principal)? <= user_usdc_balance {
+            best = mid;
+            low = mid.saturating_add(1);
+        } else if mid == 0 {
+            break;
+        } else {
+            high = mid - 1;
+        }
+    }
+
+    if best == 0 {
         return Err(Error::validation(format!(
             "user_usdc_balance {user_usdc_balance} too small to cover fees at price {price}; \
              fee-adjusted amount truncated to zero"
         )));
     }
-    Ok(adjusted)
+    Ok(Decimal::from(best) / scale)
 }
 
 fn decimal_pow(base: Decimal, exponent: u32) -> Result<Decimal> {
@@ -245,6 +337,7 @@ mod tests {
     use rust_decimal_macros::dec;
 
     use super::*;
+    use crate::clob::types::response::BuilderFeeRateResponse;
     use crate::types::{B256, U256};
 
     fn make_orderbook(
@@ -475,7 +568,7 @@ mod tests {
     }
 
     #[test]
-    fn adjust_market_buy_with_builder_fee() {
+    fn builder_share_without_kuest_fee_charges_zero() {
         let result = adjust_market_buy_amount(
             dec!(100),
             dec!(100),
@@ -485,9 +578,7 @@ mod tests {
             dec!(0.005),
         )
         .unwrap();
-        // effective * 1.005 = 100, truncated to 6 USDC decimals.
-        let expected = (dec!(100) / dec!(1.005)).trunc_with_scale(USDC_DECIMALS);
-        assert_eq!(result, expected);
+        assert_eq!(result, dec!(100));
     }
 
     #[test]
@@ -514,9 +605,32 @@ mod tests {
         (amount / price) * rate_factor
     }
 
-    /// `builder_fee = amount × rate` (flat percentage on notional).
-    fn calc_builder_fee(amount: Decimal, rate: Decimal) -> Decimal {
-        amount * rate
+    fn calc_grossed_fee(
+        amount: Decimal,
+        price: Decimal,
+        rate: Decimal,
+        exponent: u32,
+        builder_share: Decimal,
+    ) -> Decimal {
+        calc_platform_fee(amount, price, rate, exponent) / (Decimal::ONE - builder_share)
+    }
+
+    fn calc_exact_total_fee(
+        amount: Decimal,
+        price: Decimal,
+        rate: Decimal,
+        exponent: u32,
+        builder_share_bps: u32,
+    ) -> Decimal {
+        calculate_dynamic_fee_breakdown(
+            amount / price,
+            price,
+            rate,
+            Decimal::from(exponent),
+            builder_share_bps,
+        )
+        .unwrap()
+        .total_fee
     }
 
     fn close_to(actual: Decimal, expected: Decimal, tol: Decimal) {
@@ -572,38 +686,13 @@ mod tests {
         );
     }
 
-    // Builder fee (flat %).
-
     #[test]
-    fn builder_fee_1_pct() {
-        // 1% on 100 contracts at 50c → 0.5
-        close_to(
-            calc_builder_fee(dec!(100) * dec!(0.5), dec!(0.01)),
-            dec!(0.5),
-            dec!(0.000001),
-        );
-    }
-
-    #[test]
-    fn builder_fee_5_pct() {
-        // 5% on 200 contracts at 75c → 7.5
-        close_to(
-            calc_builder_fee(dec!(200) * dec!(0.75), dec!(0.05)),
-            dec!(7.5),
-            dec!(0.000001),
-        );
-    }
-
-    // Combined platform + builder fee.
-
-    #[test]
-    fn combined_platform_and_builder_fee() {
+    fn grossed_fee_preserves_the_kuest_base() {
         let amount_usd = dec!(100) * dec!(0.5);
         let platform = calc_platform_fee(amount_usd, dec!(0.5), dec!(0.25), 2);
-        let builder = calc_builder_fee(amount_usd, dec!(0.01));
+        let total = calc_grossed_fee(amount_usd, dec!(0.5), dec!(0.25), 2, dec!(0.3));
         close_to(platform, dec!(1.5625), dec!(0.000001));
-        close_to(builder, dec!(0.5), dec!(0.000001));
-        close_to(platform + builder, dec!(2.0625), dec!(0.000001));
+        close_to(total * dec!(0.7), platform, dec!(0.000001));
     }
 
     // `adjust_market_buy_amount` boundary behaviour.
@@ -640,141 +729,207 @@ mod tests {
         let price = dec!(0.5);
         let adjusted =
             adjust_market_buy_amount(amount, amount, price, dec!(0.25), dec!(2), dec!(0)).unwrap();
-        let fee = calc_platform_fee(adjusted, price, dec!(0.25), 2);
-        close_to(adjusted + fee, amount, dec!(0.000001));
+        let fee = calc_exact_total_fee(adjusted, price, dec!(0.25), 2, 0);
+        assert!(adjusted + fee <= amount);
+        assert!(amount - adjusted - fee < dec!(0.000002));
         assert!(adjusted < amount);
     }
 
     #[test]
-    fn adjust_buy_conserves_notional_builder_only() {
+    fn builder_share_without_a_platform_fee_charges_zero() {
         let amount = dec!(50);
         let price = dec!(0.5);
-        let builder_rate = dec!(0.01);
         let adjusted =
-            adjust_market_buy_amount(amount, amount, price, dec!(0), dec!(0), builder_rate)
-                .unwrap();
-        let fee = calc_builder_fee(adjusted, builder_rate);
-        close_to(adjusted + fee, amount, dec!(0.000001));
+            adjust_market_buy_amount(amount, amount, price, dec!(0), dec!(0), dec!(0.3)).unwrap();
+        assert_eq!(adjusted, amount);
     }
 
     #[test]
     fn adjust_buy_conserves_notional_platform_and_builder() {
         let amount = dec!(50);
         let price = dec!(0.5);
-        let builder_rate = dec!(0.01);
+        let builder_share = dec!(0.3);
         let adjusted =
-            adjust_market_buy_amount(amount, amount, price, dec!(0.25), dec!(2), builder_rate)
+            adjust_market_buy_amount(amount, amount, price, dec!(0.25), dec!(2), builder_share)
                 .unwrap();
-        let platform = calc_platform_fee(adjusted, price, dec!(0.25), 2);
-        let builder = calc_builder_fee(adjusted, builder_rate);
-        close_to(adjusted + platform + builder, amount, dec!(0.000001));
+        let total_fee = calc_exact_total_fee(adjusted, price, dec!(0.25), 2, 3_000);
+        assert!(adjusted + total_fee <= amount);
+        assert!(amount - adjusted - total_fee < dec!(0.000002));
     }
 
     #[test]
     fn adjust_buy_conserves_notional_at_price_0_3() {
         let amount = dec!(30);
         let price = dec!(0.3);
-        let builder_rate = dec!(0.02);
+        let builder_share = dec!(0.45);
         let adjusted =
-            adjust_market_buy_amount(amount, amount, price, dec!(0.25), dec!(2), builder_rate)
+            adjust_market_buy_amount(amount, amount, price, dec!(0.25), dec!(2), builder_share)
                 .unwrap();
-        let platform = calc_platform_fee(adjusted, price, dec!(0.25), 2);
-        let builder = calc_builder_fee(adjusted, builder_rate);
-        close_to(adjusted + platform + builder, amount, dec!(0.000001));
+        let total_fee = calc_exact_total_fee(adjusted, price, dec!(0.25), 2, 4_500);
+        assert!(adjusted + total_fee <= amount);
+        assert!(amount - adjusted - total_fee < dec!(0.000002));
     }
 
-    // Production V2 fee tiers (all exp=1):
-    //   sports          rate=0.05
-    //   politics family rate=0.04  (politics, tech, finance_prices, mentions)
-    //   culture family  rate=0.05  (culture, weather, general, economics)
-    //   crypto          rate=0.07
+    // Kuest fee tiers (all exp=1).
 
     #[test]
     fn production_fee_sports_v2() {
         close_to(
-            calc_platform_fee(dec!(100), dec!(0.5), dec!(0.05), 1),
-            dec!(2.5),
+            calc_platform_fee(dec!(100), dec!(0.5), dec!(0.0315), 1),
+            dec!(1.575),
             dec!(0.000001),
         );
         close_to(
-            calc_platform_fee(dec!(100), dec!(0.3), dec!(0.05), 1),
-            dec!(3.5),
+            calc_platform_fee(dec!(100), dec!(0.3), dec!(0.0315), 1),
+            dec!(2.205),
             dec!(0.000001),
         );
         close_to(
-            calc_platform_fee(dec!(100), dec!(0.7), dec!(0.05), 1),
-            dec!(1.5),
+            calc_platform_fee(dec!(100), dec!(0.7), dec!(0.0315), 1),
+            dec!(0.945),
             dec!(0.000001),
         );
     }
 
     #[test]
     fn production_fee_politics_family() {
-        // rate=0.04, exp=1 — politics, tech, finance_prices, mentions
+        // rate=0.0252, exp=1 — politics, tech, finance, mentions
         close_to(
-            calc_platform_fee(dec!(100), dec!(0.5), dec!(0.04), 1),
-            dec!(2.0),
+            calc_platform_fee(dec!(100), dec!(0.5), dec!(0.0252), 1),
+            dec!(1.26),
             dec!(0.000001),
         );
         close_to(
-            calc_platform_fee(dec!(100), dec!(0.3), dec!(0.04), 1),
-            dec!(2.8),
+            calc_platform_fee(dec!(100), dec!(0.3), dec!(0.0252), 1),
+            dec!(1.764),
             dec!(0.000001),
         );
         close_to(
-            calc_platform_fee(dec!(100), dec!(0.7), dec!(0.04), 1),
-            dec!(1.2),
+            calc_platform_fee(dec!(100), dec!(0.7), dec!(0.0252), 1),
+            dec!(0.756),
             dec!(0.000001),
         );
     }
 
     #[test]
     fn production_fee_culture_family() {
-        // rate=0.05, exp=1 — culture, weather, general, economics
+        // rate=0.0315, exp=1 — culture, weather, general, economics
         close_to(
-            calc_platform_fee(dec!(100), dec!(0.5), dec!(0.05), 1),
-            dec!(2.5),
+            calc_platform_fee(dec!(100), dec!(0.5), dec!(0.0315), 1),
+            dec!(1.575),
             dec!(0.000001),
         );
         close_to(
-            calc_platform_fee(dec!(100), dec!(0.3), dec!(0.05), 1),
-            dec!(3.5),
+            calc_platform_fee(dec!(100), dec!(0.3), dec!(0.0315), 1),
+            dec!(2.205),
             dec!(0.000001),
         );
         close_to(
-            calc_platform_fee(dec!(100), dec!(0.7), dec!(0.05), 1),
-            dec!(1.5),
+            calc_platform_fee(dec!(100), dec!(0.7), dec!(0.0315), 1),
+            dec!(0.945),
             dec!(0.000001),
         );
     }
 
     #[test]
     fn production_fee_crypto_v2() {
-        // rate=0.07, exp=1
+        // rate=0.0441, exp=1
         close_to(
-            calc_platform_fee(dec!(100), dec!(0.5), dec!(0.07), 1),
-            dec!(3.5),
+            calc_platform_fee(dec!(100), dec!(0.5), dec!(0.0441), 1),
+            dec!(2.205),
             dec!(0.000001),
         );
         close_to(
-            calc_platform_fee(dec!(100), dec!(0.3), dec!(0.07), 1),
-            dec!(4.9),
+            calc_platform_fee(dec!(100), dec!(0.3), dec!(0.0441), 1),
+            dec!(3.087),
             dec!(0.000001),
         );
         close_to(
-            calc_platform_fee(dec!(100), dec!(0.7), dec!(0.07), 1),
-            dec!(2.1),
+            calc_platform_fee(dec!(100), dec!(0.7), dec!(0.0441), 1),
+            dec!(1.323),
             dec!(0.000001),
         );
     }
 
     #[test]
-    fn production_fee_geopolitics_is_zero() {
-        for price in [dec!(0.3), dec!(0.5), dec!(0.7)] {
+    fn production_fee_geopolitics_matches_politics() {
+        for (price, expected) in [
+            (dec!(0.3), dec!(1.764)),
+            (dec!(0.5), dec!(1.26)),
+            (dec!(0.7), dec!(0.756)),
+        ] {
             assert_eq!(
-                calc_platform_fee(dec!(100), price, Decimal::ZERO, 1),
-                Decimal::ZERO
+                calc_platform_fee(dec!(100), price, dec!(0.0252), 1),
+                expected
             );
+        }
+    }
+
+    #[test]
+    fn production_crypto_golden_prices_for_100_shares() {
+        for (price, expected_base) in [
+            (dec!(0.01), dec!(0.04366)),
+            (dec!(0.1), dec!(0.3969)),
+            (dec!(0.5), dec!(1.1025)),
+            (dec!(0.9), dec!(0.3969)),
+            (dec!(0.99), dec!(0.04366)),
+        ] {
+            assert_eq!(
+                calculate_dynamic_fee_breakdown(dec!(100), price, dec!(0.0441), dec!(1), 3_000)
+                    .unwrap()
+                    .kuest_fee_base,
+                expected_base
+            );
+        }
+    }
+
+    #[test]
+    fn production_category_midpoint_fixtures_for_100_shares() {
+        for (rate, expected_base) in [
+            (dec!(0.0441), dec!(1.1025)),
+            (dec!(0.0315), dec!(0.7875)),
+            (dec!(0.0252), dec!(0.63)),
+        ] {
+            assert_eq!(
+                calculate_dynamic_fee_breakdown(dec!(100), dec!(0.5), rate, dec!(1), 3_000)
+                    .unwrap()
+                    .kuest_fee_base,
+                expected_base
+            );
+        }
+    }
+
+    #[test]
+    fn production_operator_share_and_fallback_fixtures() {
+        for (share, total, operator, kuest) in [
+            (2_000, dec!(1.37813), dec!(0.275626), dec!(1.102504)),
+            (3_000, dec!(1.575), dec!(0.4725), dec!(1.1025)),
+            (4_500, dec!(2.00455), dec!(0.902047), dec!(1.102503)),
+        ] {
+            let breakdown =
+                calculate_dynamic_fee_breakdown(dec!(100), dec!(0.5), dec!(0.0441), dec!(1), share)
+                    .unwrap();
+            assert_eq!(breakdown.kuest_fee_base, dec!(1.1025));
+            assert_eq!(breakdown.total_fee, total);
+            assert_eq!(breakdown.operator_fee, operator);
+            assert_eq!(breakdown.kuest_fee, kuest);
+        }
+
+        let fallback: BuilderFeeRateResponse = serde_json::from_str("{}").unwrap();
+        assert_eq!(fallback.builder_taker_fee_share_bps, 3_000);
+        assert_eq!(fallback.builder_maker_flat_fee_bps, 0);
+    }
+
+    #[test]
+    fn builder_maker_flat_response_fixtures() {
+        for maker_flat in [0, 100] {
+            let response: BuilderFeeRateResponse = serde_json::from_value(serde_json::json!({
+                "builder_maker_flat_fee_bps": maker_flat,
+                "builder_taker_fee_share_bps": 3_000
+            }))
+            .unwrap();
+            assert_eq!(response.builder_maker_flat_fee_bps, maker_flat);
+            assert_eq!(response.builder_taker_fee_share_bps, 3_000);
         }
     }
 
@@ -784,11 +939,11 @@ mod tests {
         // when `balance == amount` (i.e. the budget is fully consumed).
         let amount = dec!(100);
         let tiers: [(&str, Decimal, u32); 5] = [
-            ("sports_v2", dec!(0.05), 1),
-            ("politics_family", dec!(0.04), 1),
-            ("culture_family", dec!(0.05), 1),
-            ("crypto_v2", dec!(0.07), 1),
-            ("geopolitics", dec!(0), 1),
+            ("sports_v2", dec!(0.0315), 1),
+            ("politics_family", dec!(0.0252), 1),
+            ("culture_family", dec!(0.0315), 1),
+            ("crypto_v2", dec!(0.0441), 1),
+            ("geopolitics", dec!(0.0252), 1),
         ];
         let prices = [dec!(0.3), dec!(0.5), dec!(0.7)];
         for (name, rate, exponent) in tiers {
@@ -799,15 +954,15 @@ mod tests {
                     price,
                     rate,
                     Decimal::from(exponent),
-                    dec!(0),
+                    dec!(0.3),
                 )
                 .unwrap_or_else(|e| {
                     panic!("adjust failed for {name} @ price={price}: {e}");
                 });
-                let fee = calc_platform_fee(adjusted, price, rate, exponent);
-                let diff = (adjusted + fee - amount).abs();
+                let fee = calc_exact_total_fee(adjusted, price, rate, exponent, 3_000);
+                let diff = amount - adjusted - fee;
                 assert!(
-                    diff <= dec!(0.0001),
+                    diff >= Decimal::ZERO && diff < dec!(0.000002),
                     "tier={name} price={price}: adjusted ({adjusted}) + fee ({fee}) = {} vs \
                      amount {amount}, diff {diff}",
                     adjusted + fee,

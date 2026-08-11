@@ -61,35 +61,35 @@ pub(crate) type Timestamp = i64;
 
 static CONFIG: phf::Map<ChainId, ContractConfig> = phf_map! {
     137_u64 => ContractConfig {
-        exchange: address!("0xaCd95F4F42322c7bE215C170362EEc57Ef4E78c2"),
+        exchange: address!("0xaa1b8dE834E16eC69C044F5300041673C968c9eF"),
         collateral: address!("0x3c499c542cef5e3811e1192ce70d8cc03d5c3359"),
         conditional_tokens: address!("0x4682048725865bf17067bd85fF518527A262A9C7"),
         neg_risk_adapter: None,
-        exchange_v2: Some(address!("0xaCd95F4F42322c7bE215C170362EEc57Ef4E78c2")),
+        exchange_v2: Some(address!("0xaa1b8dE834E16eC69C044F5300041673C968c9eF")),
     },
     80002_u64 => ContractConfig {
-        exchange: address!("0xaCd95F4F42322c7bE215C170362EEc57Ef4E78c2"),
+        exchange: address!("0xaa1b8dE834E16eC69C044F5300041673C968c9eF"),
         collateral: address!("0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582"),
         conditional_tokens: address!("0x4682048725865bf17067bd85fF518527A262A9C7"),
         neg_risk_adapter: None,
-        exchange_v2: Some(address!("0xaCd95F4F42322c7bE215C170362EEc57Ef4E78c2")),
+        exchange_v2: Some(address!("0xaa1b8dE834E16eC69C044F5300041673C968c9eF")),
     },
 };
 
 static NEG_RISK_CONFIG: phf::Map<ChainId, ContractConfig> = phf_map! {
     137_u64 => ContractConfig {
-        exchange: address!("0x961d3230B3BBdb2592D20fa34dBD12Fa19240603"),
+        exchange: address!("0xe7FA09cA716FDf498d74AFF618d32AFeacc310aB"),
         collateral: address!("0x3c499c542cef5e3811e1192ce70d8cc03d5c3359"),
         conditional_tokens: address!("0x4682048725865bf17067bd85fF518527A262A9C7"),
         neg_risk_adapter: Some(address!("0xd9416E904e1ab925ad72F03F6D6ce0Aa80fd2dC5")),
-        exchange_v2: Some(address!("0x961d3230B3BBdb2592D20fa34dBD12Fa19240603")),
+        exchange_v2: Some(address!("0xe7FA09cA716FDf498d74AFF618d32AFeacc310aB")),
     },
     80002_u64 => ContractConfig {
-        exchange: address!("0x961d3230B3BBdb2592D20fa34dBD12Fa19240603"),
+        exchange: address!("0xe7FA09cA716FDf498d74AFF618d32AFeacc310aB"),
         collateral: address!("0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582"),
         conditional_tokens: address!("0x4682048725865bf17067bd85fF518527A262A9C7"),
         neg_risk_adapter: Some(address!("0xd9416E904e1ab925ad72F03F6D6ce0Aa80fd2dC5")),
-        exchange_v2: Some(address!("0x961d3230B3BBdb2592D20fa34dBD12Fa19240603")),
+        exchange_v2: Some(address!("0xe7FA09cA716FDf498d74AFF618d32AFeacc310aB")),
     },
 };
 
@@ -232,7 +232,7 @@ mod tests {
         let cfg = contract_config(AMOY, false).expect("missing config");
         assert_eq!(
             cfg.exchange,
-            address!("0xaCd95F4F42322c7bE215C170362EEc57Ef4E78c2")
+            address!("0xaa1b8dE834E16eC69C044F5300041673C968c9eF")
         );
     }
 
@@ -241,7 +241,7 @@ mod tests {
         let cfg = contract_config(AMOY, true).expect("missing config");
         assert_eq!(
             cfg.exchange,
-            address!("0x961d3230B3BBdb2592D20fa34dBD12Fa19240603")
+            address!("0xe7FA09cA716FDf498d74AFF618d32AFeacc310aB")
         );
     }
 }
