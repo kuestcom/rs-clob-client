@@ -173,18 +173,27 @@ pub struct LastTradesPricesResponse {
 }
 
 /// Response from `GET /markets-by-token/{token_id}`. This endpoint returns a minimal
-/// market descriptor — just the condition ID and the two outcome token IDs — not a full
-/// [`MarketResponse`]. Used to resolve `token_id -> condition_id` before fetching the
+/// market descriptor — the condition ID, outcome token IDs, and optional mirror identifiers —
+/// not a full [`MarketResponse`]. Used to resolve `token_id -> condition_id` before fetching the
 /// full clob-market info.
 #[non_exhaustive]
 #[serde_as]
 #[derive(Debug, Clone, Deserialize, Builder, PartialEq)]
 pub struct MarketByTokenResponse {
     pub condition_id: B256,
+    #[serde_as(as = "NoneAsEmptyString")]
+    #[serde(default)]
+    pub mirror_condition_id: Option<B256>,
     #[serde_as(as = "DisplayFromStr")]
     pub primary_token_id: U256,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub mirror_primary_token_id: Option<U256>,
     #[serde_as(as = "DisplayFromStr")]
     pub secondary_token_id: U256,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub mirror_secondary_token_id: Option<U256>,
 }
 
 #[expect(
@@ -208,6 +217,11 @@ pub struct MarketResponse {
     #[serde_as(as = "NoneAsEmptyString")]
     #[serde(default)]
     pub condition_id: Option<B256>,
+    /// The corresponding Polymarket condition ID when this is a mirror market.
+    #[serde_as(as = "NoneAsEmptyString")]
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mirror_condition_id: Option<B256>,
     /// The CTF question ID.
     #[serde_as(as = "NoneAsEmptyString")]
     #[serde(default)]
@@ -251,6 +265,10 @@ pub struct MarketResponse {
 #[builder(on(String, into))]
 pub struct Token {
     pub token_id: U256,
+    /// The corresponding Polymarket token ID when this token is mirrored.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mirror_token_id: Option<U256>,
     pub outcome: String,
     pub price: Decimal,
     #[serde(default)]
@@ -270,6 +288,11 @@ pub struct SimplifiedMarketResponse {
     #[serde_as(as = "NoneAsEmptyString")]
     #[serde(default)]
     pub condition_id: Option<B256>,
+    /// The corresponding Polymarket condition ID when this is a mirror market.
+    #[serde_as(as = "NoneAsEmptyString")]
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mirror_condition_id: Option<B256>,
     #[serde(default)]
     #[serde_as(deserialize_as = "DefaultOnNull")]
     pub tokens: Vec<Token>,
@@ -786,6 +809,9 @@ pub struct FeeDetails {
 pub struct ClobToken {
     #[serde(rename = "t")]
     pub token_id: U256,
+    /// The corresponding Polymarket token ID when this token is mirrored.
+    #[serde(rename = "mirror_token_id", default)]
+    pub mirror_token_id: Option<U256>,
     #[serde(rename = "o")]
     pub outcome: String,
 }
@@ -798,6 +824,10 @@ pub struct ClobToken {
 pub struct ClobMarketInfoResponse {
     #[serde(rename = "c")]
     pub condition_id: B256,
+    /// The corresponding Polymarket condition ID when this is a mirror market.
+    #[serde(rename = "mirror_condition_id", default)]
+    #[serde_as(as = "NoneAsEmptyString")]
+    pub mirror_condition_id: Option<B256>,
     #[serde(rename = "t", default)]
     #[serde_as(deserialize_as = "DefaultOnNull")]
     pub tokens: Vec<Option<ClobToken>>,

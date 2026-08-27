@@ -203,6 +203,8 @@ pub struct MarketsRequest {
     pub question_ids: Vec<B256>,
     pub include_tag: Option<bool>,
     pub closed: Option<bool>,
+    /// Filter for markets mirrored from Polymarket.
+    pub mirror: Option<bool>,
 }
 
 #[skip_serializing_none]

@@ -391,11 +391,13 @@ mod events {
 }
 
 mod markets {
+    use alloy::primitives::U256;
     use httpmock::{Method::GET, MockServer};
     use kuest_client_sdk::gamma::{
         Client,
         types::request::{MarketByIdRequest, MarketBySlugRequest, MarketsRequest},
     };
+    use kuest_client_sdk::types::b256;
     use reqwest::StatusCode;
     use serde_json::json;
 
@@ -407,22 +409,39 @@ mod markets {
         let client = Client::new(&server.base_url())?;
 
         let mock = server.mock(|when, then| {
-            when.method(GET).path("/markets").query_param("limit", "10");
+            when.method(GET)
+                .path("/markets")
+                .query_param("limit", "10")
+                .query_param("mirror", "true");
             then.status(StatusCode::OK).json_body(json!([
                 {
                     "id": "1",
                     "question": "Test Market?",
-                    "slug": "test-market"
+                    "slug": "test-market",
+                    "conditionId": "0x0000000000000000000000000000000000000000000000000000000000000001",
+                    "mirrorConditionId": "0x0000000000000000000000000000000000000000000000000000000000000002",
+                    "clobTokenIds": "[\"1\",\"2\"]",
+                    "mirrorClobTokenIds": "[\"2\",\"1\"]"
                 }
             ]));
         });
 
-        let request = MarketsRequest::builder().limit(10).build();
+        let request = MarketsRequest::builder().limit(10).mirror(true).build();
         let response = client.markets(&request).await?;
 
         assert_eq!(response.len(), 1);
         assert_eq!(response[0].id, "1");
         assert_eq!(response[0].question, Some("Test Market?".to_owned()));
+        assert_eq!(
+            response[0].mirror_condition_id,
+            Some(b256!(
+                "0000000000000000000000000000000000000000000000000000000000000002"
+            ))
+        );
+        assert_eq!(
+            response[0].mirror_clob_token_ids,
+            Some(vec![U256::from(2), U256::from(1)])
+        );
         mock.assert();
 
         Ok(())
@@ -1148,6 +1167,7 @@ mod query_string {
             ])
             .include_tag(true)
             .closed(false)
+            .mirror(true)
             .build();
 
         let qs = request.query_params(None);
@@ -1192,6 +1212,7 @@ mod query_string {
         ));
         assert!(qs.contains("include_tag=true"));
         assert!(qs.contains("closed=false"));
+        assert!(qs.contains("mirror=true"));
     }
 
     #[test]

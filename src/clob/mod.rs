@@ -45,6 +45,8 @@
 //! | `/book` | Full orderbook depth |
 //! | `/books` | Batch orderbooks |
 //! | `/market` | Single market details |
+//! | `/clob-markets/{condition_id}` | Compact market info, including mirror identifiers |
+//! | `/markets-by-token/{token_id}` | Resolve a token to its market and mirror identifiers |
 //! | `/markets` | All markets (paginated) |
 //! | `/sampling-markets` | Sampling program markets |
 //! | `/simplified-markets` | Markets with reduced detail |

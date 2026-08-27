@@ -27,7 +27,7 @@
 //! | `/events/{id}` | Get event by ID |
 //! | `/events/slug/{slug}` | Get event by slug |
 //! | `/events/{id}/tags` | Get event tags |
-//! | `/markets` | List markets |
+//! | `/markets` | List markets; use `mirror=true` or `mirror=false` to filter mirror status |
 //! | `/markets/{id}` | Get market by ID |
 //! | `/markets/slug/{slug}` | Get market by slug |
 //! | `/markets/{id}/tags` | Get market tags |

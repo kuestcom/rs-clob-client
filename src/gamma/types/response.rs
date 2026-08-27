@@ -347,6 +347,11 @@ pub struct Market {
     #[serde_as(as = "NoneAsEmptyString")]
     #[serde(default)]
     pub condition_id: Option<B256>,
+    /// The corresponding Polymarket condition ID when this is a mirror market.
+    #[serde_as(as = "NoneAsEmptyString")]
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mirror_condition_id: Option<B256>,
     pub slug: Option<String>,
     pub twitter_card_image: Option<String>,
     pub resolution_source: Option<String>,
@@ -420,6 +425,10 @@ pub struct Market {
     pub seconds_delay: Option<i32>,
     #[serde_as(as = "Option<JsonString>")]
     pub clob_token_ids: Option<Vec<U256>>,
+    /// Mirror token IDs serialized by Gamma as a JSON string.
+    #[serde_as(as = "Option<JsonString>")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mirror_clob_token_ids: Option<Vec<U256>>,
     pub disqus_thread: Option<String>,
     pub short_outcomes: Option<String>,
     #[serde(rename = "teamAID")]

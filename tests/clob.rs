@@ -759,6 +759,7 @@ mod unauthenticated {
                 "minimum_order_size": "1",
                 "minimum_tick_size": "0.01",
                 "condition_id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+                "mirror_condition_id": "0x0000000000000000000000000000000000000000000000000000000000000002",
                 "question_id": "0x0000000000000000000000000000000000000000000000000000000067890abc",
                 "question": "Will BTC close above $50k today?",
                 "description": "A market about BTC daily close price",
@@ -784,12 +785,14 @@ mod unauthenticated {
                 "tokens": [
                     {
                         "token_id": token_1(),
+                        "mirror_token_id": token_2(),
                         "outcome": "YES",
                         "price": "0.55",
                         "winner": false
                     },
                     {
                         "token_id": token_2(),
+                        "mirror_token_id": token_1(),
                         "outcome": "NO",
                         "price": "0.45",
                         "winner": false
@@ -817,6 +820,9 @@ mod unauthenticated {
             .condition_id(b256!(
                 "0000000000000000000000000000000000000000000000000000000000000001"
             ))
+            .mirror_condition_id(b256!(
+                "0000000000000000000000000000000000000000000000000000000000000002"
+            ))
             .question_id(b256!(
                 "0000000000000000000000000000000000000000000000000000000067890abc"
             ))
@@ -842,12 +848,14 @@ mod unauthenticated {
             .tokens(vec![
                 Token::builder()
                     .token_id(token_1())
+                    .mirror_token_id(token_2())
                     .outcome("YES")
                     .price(dec!(0.55))
                     .winner(false)
                     .build(),
                 Token::builder()
                     .token_id(token_2())
+                    .mirror_token_id(token_1())
                     .outcome("NO")
                     .price(dec!(0.45))
                     .winner(false)
@@ -857,6 +865,87 @@ mod unauthenticated {
             .build();
 
         assert_eq!(response, expected);
+        mock.assert();
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn market_by_token_with_mirror_ids_should_succeed() -> anyhow::Result<()> {
+        let server = MockServer::start();
+        let client = Client::new(&server.base_url(), Config::default())?;
+
+        let mock = server.mock(|when, then| {
+            when.method(httpmock::Method::GET)
+                .path(format!("/markets-by-token/{}", token_1()));
+            then.status(StatusCode::OK).json_body(json!({
+                "condition_id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+                "mirror_condition_id": "0x0000000000000000000000000000000000000000000000000000000000000002",
+                "primary_token_id": token_1(),
+                "mirror_primary_token_id": token_2(),
+                "secondary_token_id": token_2(),
+                "mirror_secondary_token_id": token_1()
+            }));
+        });
+
+        let response = client.market_by_token(token_1()).await?;
+
+        assert_eq!(
+            response.condition_id,
+            b256!("0000000000000000000000000000000000000000000000000000000000000001")
+        );
+        assert_eq!(
+            response.mirror_condition_id,
+            Some(b256!(
+                "0000000000000000000000000000000000000000000000000000000000000002"
+            ))
+        );
+        assert_eq!(response.primary_token_id, token_1());
+        assert_eq!(response.mirror_primary_token_id, Some(token_2()));
+        assert_eq!(response.secondary_token_id, token_2());
+        assert_eq!(response.mirror_secondary_token_id, Some(token_1()));
+        mock.assert();
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn clob_market_info_with_mirror_ids_should_succeed() -> anyhow::Result<()> {
+        let server = MockServer::start();
+        let client = Client::new(&server.base_url(), Config::default())?;
+
+        let mock = server.mock(|when, then| {
+            when.method(httpmock::Method::GET)
+                .path("/clob-markets/0xcondition");
+            then.status(StatusCode::OK).json_body(json!({
+                "c": "0x0000000000000000000000000000000000000000000000000000000000000001",
+                "mirror_condition_id": "0x0000000000000000000000000000000000000000000000000000000000000002",
+                "t": [
+                    {
+                        "t": token_1(),
+                        "mirror_token_id": token_2(),
+                        "o": "YES"
+                    }
+                ],
+                "mts": "0.01",
+                "mos": "1",
+                "nr": false,
+                "rfqe": false
+            }));
+        });
+
+        let response = client.clob_market_info("0xcondition").await?;
+
+        assert_eq!(
+            response.mirror_condition_id,
+            Some(b256!(
+                "0000000000000000000000000000000000000000000000000000000000000002"
+            ))
+        );
+        assert_eq!(
+            response.tokens[0].as_ref().unwrap().mirror_token_id,
+            Some(token_2())
+        );
         mock.assert();
 
         Ok(())
