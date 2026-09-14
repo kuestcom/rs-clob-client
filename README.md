@@ -28,13 +28,13 @@ use std::str::FromStr;
 
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
-use kuest_client_sdk::AMOY;
+use kuest_client_sdk::POLYGON;
 use kuest_client_sdk::clob::{Client, Config};
 use kuest_client_sdk::clob::types::SignatureType;
 use kuest_client_sdk::types::Address;
 
 # async fn run() -> anyhow::Result<()> {
-let signer = LocalSigner::from_str("<owner-private-key>")?.with_chain_id(Some(AMOY));
+let signer = LocalSigner::from_str("<owner-private-key>")?.with_chain_id(Some(POLYGON));
 let deposit_wallet = Address::from_str("<deposit-wallet-address>")?;
 
 let client = Client::new("https://clob.kuest.com", Config::default())?
