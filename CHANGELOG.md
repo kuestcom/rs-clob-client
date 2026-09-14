@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.17](https://github.com/kuestcom/rs-clob-client/compare/v2.0.16...v2.0.17) - 2026-09-14
+
+### Fixed
+
+- default Rust SDK to Polygon mainnet
+
 ## [2.0.8](https://github.com/kuestcom/rs-clob-client/compare/v2.0.7...v2.0.8) - 2026-06-14
 
 ### Fixed
